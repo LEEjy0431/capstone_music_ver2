@@ -1,0 +1,31 @@
+name: capstone-music-windows
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  # --- 네이티브 바이너리 의존이 있는 것들은 conda로 설치 ---
+  - numpy
+  - scipy
+  - pandas
+  - libsndfile
+  - fluidsynth
+  - soxr
+  - ffmpeg
+  - libffi
+  - matplotlib
+  - h5py
+  - pillow
+  - mido
+  - numba
+  - llvmlite
+  - setuptools
+  # PyTorch CPU (GPU 사용 시 README 참고)
+  - pytorch
+  - torchvision
+  - torchaudio
+  - cpuonly
+  # --- 순수 파이썬 패키지는 requirements-windows.txt 로 따로 설치 ---
+  # (run.bat 에서 conda activate 이후 pip install -r 수행)
