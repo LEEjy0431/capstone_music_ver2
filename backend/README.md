@@ -127,6 +127,69 @@ multipart Form
 
 ---
 
+## 라이브러리 설치
+
+### Go 런타임 설치
+
+```bash
+# macOS
+brew install go
+
+# Ubuntu / Debian
+sudo apt install golang-go
+
+# Windows — https://go.dev/dl/ 에서 설치 파일 다운로드
+
+# 버전 확인 (1.21 이상 필요)
+go version
+```
+
+### Go 모듈 의존성 설치
+
+```bash
+cd backend
+
+# go.mod 에 정의된 모든 의존성 다운로드
+go mod download
+
+# 또는 빌드 시 자동 다운로드
+go build ./...
+```
+
+### 의존성 목록 (`go.mod`)
+
+| 패키지 | 역할 | 비고 |
+|--------|------|------|
+| `net/http` (표준 라이브러리) | HTTP 서버, 라우팅, multipart 파싱 | 외부 설치 불필요 |
+| `encoding/json` (표준 라이브러리) | JSON 직렬화·역직렬화 | 외부 설치 불필요 |
+| `os/exec` (표준 라이브러리) | Python subprocess 실행 | 외부 설치 불필요 |
+| `bufio`, `strings` (표준 라이브러리) | SSE 스트림 파싱 | 외부 설치 불필요 |
+| `log/slog` (표준 라이브러리) | 구조화 로깅 | Go 1.21+ 포함 |
+
+> **외부 패키지 없음**: 이 서버는 Go 표준 라이브러리만 사용합니다.  
+> OpenAI API는 `net/http` 로 직접 호출하므로 별도 SDK 불필요.
+
+### OpenAI API 키 발급
+
+1. `https://platform.openai.com/api-keys` 접속
+2. `+ Create new secret key` 클릭
+3. 키 복사 후 `.env` 파일에 저장:
+
+```bash
+cp .env.example .env
+# .env 파일 편집
+OPENAI_API_KEY=sk-...
+```
+
+### go.mod 초기화 (저장소 클론 후 최초 1회)
+
+```bash
+cd backend
+go mod tidy   # 미사용 의존성 제거, 누락 의존성 추가
+```
+
+---
+
 ## 환경변수
 
 | 변수 | 필수 | 기본값 | 설명 |

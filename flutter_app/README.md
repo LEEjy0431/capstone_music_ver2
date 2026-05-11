@@ -77,16 +77,85 @@ UI 렌더링
 
 ---
 
-## 의존성
+## 라이브러리 설치
 
-| 패키지 | 버전 | 용도 |
+### Flutter SDK 설치
+
+```bash
+# macOS (Homebrew)
+brew install --cask flutter
+
+# Ubuntu / Debian
+sudo snap install flutter --classic
+
+# Windows — https://docs.flutter.dev/get-started/install/windows 에서 설치
+```
+
+```bash
+# 설치 확인 (모든 항목 ✓ 필요)
+flutter doctor
+```
+
+> Android 빌드가 필요한 경우 Android Studio도 설치하세요.  
+> `flutter doctor --android-licenses` 로 라이선스를 수락합니다.
+
+### 패키지 의존성 설치
+
+```bash
+# flutter_app/ 디렉터리에서 실행
+cd flutter_app
+flutter pub get
+```
+
+> `pubspec.yaml` 이 변경된 경우 언제나 `flutter pub get` 을 다시 실행하세요.
+
+### 의존성 업그레이드
+
+```bash
+# 버전 범위 내 최신 버전으로 업그레이드
+flutter pub upgrade
+
+# 특정 패키지만 업그레이드
+flutter pub upgrade http
+```
+
+### 패키지 목록 (`pubspec.yaml`)
+
+#### 런타임 의존성
+
+| 패키지 | 버전 | 역할 | 설치 경로 |
+|--------|------|------|-----------|
+| `http` | ^1.2.0 | Go 백엔드 API 호출, multipart 파일 업로드, SSE 스트림 수신 | pub.dev |
+| `file_picker` | ^8.0.0 | WAV / XML 파일 선택 — Web(바이트 직접), Android(파일 시스템) 공통 지원 | pub.dev |
+| `provider` | ^6.1.0 | ChangeNotifier 기반 전역 상태 관리 (`RecordProvider`) | pub.dev |
+| `shared_preferences` | ^2.2.0 | 분석 기록 로컬 저장, 다크모드 설정 영속화 | pub.dev |
+| `fl_chart` | ^0.68.0 | 점수 추이 그래프, 요일별 분포 막대 차트 | pub.dev |
+| `intl` | ^0.19.0 | 날짜·시간 포맷 (`DateFormat`) | pub.dev |
+
+#### 개발 의존성
+
+| 패키지 | 버전 | 역할 |
 |--------|------|------|
-| `http` | ^1.2.0 | API 호출 (multipart) |
-| `file_picker` | ^8.0.0 | WAV/XML 파일 선택 (Web + Android) |
-| `provider` | ^6.1.0 | 상태 관리 |
-| `shared_preferences` | ^2.2.0 | 로컬 저장소 |
-| `fl_chart` | ^0.68.0 | 차트 |
-| `intl` | ^0.19.0 | 날짜 포맷 |
+| `flutter_lints` | ^3.0.0 | 코드 스타일 린팅 규칙 |
+| `flutter_test` | SDK | 위젯 단위 테스트 프레임워크 |
+
+### 설치 확인
+
+```bash
+# 설치된 패키지 목록 출력
+flutter pub deps
+
+# 패키지 충돌 또는 버전 오류 확인
+flutter pub outdated
+```
+
+### 캐시 초기화 (설치 오류 시)
+
+```bash
+# pub 캐시 삭제 후 재설치
+flutter pub cache clean
+flutter pub get
+```
 
 ---
 

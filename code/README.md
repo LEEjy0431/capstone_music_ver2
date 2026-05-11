@@ -143,15 +143,99 @@ code/
 
 ---
 
-## 의존성 설치
+## 라이브러리 설치
+
+### 방법 1 — pip (Windows / Linux)
 
 ```bash
-# Windows / Linux — 분석 + LLM 전체 설치
+# 프로젝트 루트에서 실행
+# 분석 스택 + LLM 스택 전체 설치
 pip install -r requirements.txt -r requirements-llm.txt
-
-# macOS (Apple Silicon)
-pip install -r requirements.txt -r requirements-mac.txt -r requirements-llm.txt
 ```
+
+### 방법 2 — pip (macOS Apple Silicon)
+
+```bash
+# tensorflow-macos 포함 전체 설치
+pip install -r requirements.txt -r requirements-mac.txt -r requirements-llm.txt
+
+# tensorflow-macos 설치 실패 시 수동 설치
+pip uninstall tensorflow -y
+pip install tensorflow-macos==2.16.2
+pip install tensorflow-metal   # GPU 가속 (선택)
+```
+
+### 방법 3 — Anaconda (권장, macOS / Linux)
+
+```bash
+# 최초 1회: 환경 생성
+CONDA_SUBDIR=osx-arm64 conda env create -f code/environment.yml   # Apple Silicon
+conda env create -f code/environment.yml                           # Intel / Linux
+
+# 환경 활성화
+conda activate capstone_music
+
+# macOS: tensorflow 수동 교체 (필수)
+pip uninstall tensorflow -y
+pip install tensorflow-macos==2.16.2
+
+# 환경 업데이트 (environment.yml 변경 시)
+conda env update -f code/environment.yml --prune
+```
+
+### 설치 확인
+
+```bash
+conda activate capstone_music   # 또는 pip 가상환경 활성화
+
+python -c "
+import torch, music21, librosa, pretty_midi
+import piano_transcription_inference
+import openai
+print('모든 라이브러리 정상')
+print('PyTorch:', torch.__version__)
+print('music21:', music21.VERSION_STR)
+"
+```
+
+### 라이브러리 목록
+
+#### 분석 스택 (`requirements.txt`)
+
+| 라이브러리 | 버전 | 용도 |
+|-----------|------|------|
+| `librosa` | 0.11.0 | 오디오 파일 로딩, 리샘플링 |
+| `soundfile` | 0.13.1 | WAV 파일 읽기/쓰기 |
+| `resampy` | 0.4.3 | 고품질 오디오 리샘플링 |
+| `soxr` | 1.0.0 | 빠른 샘플레이트 변환 |
+| `audioread` | 3.1.0 | 다양한 오디오 포맷 디코딩 |
+| `music21` | 9.9.1 | MusicXML 파싱, 악보 분석 |
+| `pretty_midi` | 0.2.11 | MIDI 파일 파싱·생성 |
+| `mido` | 1.3.3 | 저수준 MIDI I/O |
+| `piano-transcription-inference` | 0.0.6 | WAV→MIDI 피아노 전사 모델 |
+| `torch` | 2.1.0 | PyTorch 딥러닝 프레임워크 |
+| `torchlibrosa` | 0.1.0 | PyTorch 기반 오디오 특성 추출 |
+| `onnxruntime` | 1.24.4 | ONNX 모델 추론 |
+| `tensorflow` | 2.16.2 | 딥러닝 (Linux/Windows) |
+| `tensorflow-macos` | 2.16.2 | 딥러닝 (macOS 전용) |
+| `numpy` | 1.26.4 | 수치 배열 연산 |
+| `scipy` | 1.11.4 | 신호 처리, 과학 연산 |
+| `scikit-learn` | 1.8.0 | 머신러닝 유틸리티 |
+| `numba` | 0.65.0 | JIT 컴파일 (librosa 가속) |
+
+#### LLM 스택 (`requirements-llm.txt`)
+
+| 라이브러리 | 버전 | 용도 |
+|-----------|------|------|
+| `openai` | ≥1.30.0 | GPT-4o-mini API 호출 (module4) |
+| `python-dotenv` | ≥1.0.0 | `.env` 파일 환경변수 로딩 |
+
+#### macOS 전용 (`requirements-mac.txt`)
+
+| 라이브러리 | 버전 | 용도 |
+|-----------|------|------|
+| `tensorflow-macos` | 2.16.2 | Apple Silicon 네이티브 TensorFlow |
+| `tensorflow-metal` | — | GPU 가속 플러그인 (선택) |
 
 ---
 

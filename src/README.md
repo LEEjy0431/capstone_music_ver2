@@ -131,6 +131,78 @@ App.jsx
 
 ---
 
+## 라이브러리 설치
+
+### Node.js 설치
+
+```bash
+# macOS (Homebrew)
+brew install node
+
+# Ubuntu / Debian
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Windows — https://nodejs.org 에서 LTS 버전 다운로드
+
+# 버전 확인 (18 이상 필요)
+node -v
+npm -v
+```
+
+### npm 패키지 설치
+
+```bash
+# 프로젝트 루트에서 실행 (package.json 위치)
+npm install
+```
+
+> `node_modules/` 폴더가 생성되며 모든 의존성이 설치됩니다.  
+> `package-lock.json` 이 있으면 정확한 버전으로 고정 설치됩니다.
+
+### 패키지 목록 (`package.json`)
+
+#### 런타임 의존성 (`dependencies`)
+
+| 패키지 | 버전 | 역할 |
+|--------|------|------|
+| `react` | ^19.2.5 | UI 컴포넌트 렌더링 라이브러리 |
+| `react-dom` | ^19.2.5 | React를 브라우저 DOM에 마운트 |
+
+#### 개발 의존성 (`devDependencies`)
+
+| 패키지 | 버전 | 역할 |
+|--------|------|------|
+| `vite` | ^8.0.10 | 빌드 도구 및 개발 서버 (HMR) |
+| `@vitejs/plugin-react` | ^6.0.1 | Vite에서 JSX/React Fast Refresh 지원 |
+| `eslint` | ^10.2.1 | 코드 린팅 |
+| `eslint-plugin-react-hooks` | ^7.1.1 | React Hooks 규칙 검사 |
+| `eslint-plugin-react-refresh` | ^0.5.2 | Fast Refresh 호환성 검사 |
+| `@eslint/js` | ^10.0.1 | ESLint 기본 규칙 세트 |
+| `globals` | ^17.5.0 | 브라우저/Node 전역 변수 정의 |
+| `@types/react` | ^19.2.14 | React TypeScript 타입 정의 |
+| `@types/react-dom` | ^19.2.3 | ReactDOM TypeScript 타입 정의 |
+
+### 설치 확인
+
+```bash
+# 설치된 패키지 목록 확인
+npm list --depth=0
+
+# 보안 취약점 스캔
+npm audit
+```
+
+### 캐시 초기화 (설치 오류 시)
+
+```bash
+# node_modules 삭제 후 재설치
+rm -rf node_modules package-lock.json
+npm install
+```
+
+---
+
 ## 환경변수
 
 `.env` 파일 (프로젝트 루트에 생성):
