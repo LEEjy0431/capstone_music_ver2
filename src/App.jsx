@@ -35,27 +35,16 @@ const TABS = [
   {id:"profile",label:"프로필",icon:NAV_ICONS.profile},
 ];
 
-function generateFakeResult(fileName) {
-  const pitch=70+Math.floor(Math.random()*25);
-  const rhythm=70+Math.floor(Math.random()*25);
-  const dynamics=70+Math.floor(Math.random()*25);
-  const tempo=70+Math.floor(Math.random()*25);
-  const avg=Math.round((pitch+rhythm+dynamics+tempo)/4);
-  const grade=avg>=90?"A":avg>=85?"A-":avg>=80?"B+":avg>=75?"B":avg>=70?"C+":"C";
-  const now=new Date();
-  const dateStr=now.toISOString().slice(0,10);
-  const hour=now.getHours();
-  const min=now.getMinutes();
-  const ampm=hour>=12?"오후":"오전";
-  const h12=hour%12||12;
-  const timeStr=`${ampm} ${h12}:${String(min).padStart(2,"0")}`;
-  return {
-    id:Date.now(),
-    title:fileName.replace(/\.[^/.]+$/,""),
-    date:dateStr,time:timeStr,
-    duration:`${Math.floor(Math.random()*5+1)}:${String(Math.floor(Math.random()*60)).padStart(2,"0")}`,
-    score:avg,grade,pitch,rhythm,dynamics,tempo,
-  };
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
+
+function formatDateTime() {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const hour = now.getHours();
+  const min = now.getMinutes();
+  const ampm = hour >= 12 ? "오후" : "오전";
+  const h12 = hour % 12 || 12;
+  return { dateStr, timeStr: `${ampm} ${h12}:${String(min).padStart(2, "0")}` };
 }
 
 export default function App() {
@@ -65,10 +54,36 @@ export default function App() {
   const [profile,setProfile]=useState({name:"사용자",email:"user@email.com",level:"초급",joinDate:"2026년 5월"});
   const C=getTheme(darkMode);
 
-  function addRecord(fileName){
-    const result=generateFakeResult(fileName);
-    setRecords(prev=>[result,...prev]);
-    return result;
+  async function addRecord(sheetFile, audioFile, lang = "ko") {
+    const formData = new FormData();
+    formData.append("sheet", sheetFile);
+    formData.append("audio", audioFile);
+    formData.append("lang", lang);
+
+    const res = await fetch(`${API_BASE}/api/analyze`, { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "서버 오류");
+
+    const { dateStr, timeStr } = formatDateTime();
+    const record = {
+      id: Date.now(),
+      title: audioFile.name.replace(/\.[^/.]+$/, ""),
+      date: dateStr,
+      time: timeStr,
+      score: data.score.score,
+      grade: data.grade,
+      lang: data.lang,
+      feedback: data.feedback,
+      scoreDetail: {
+        correct: data.score.correct,
+        total: data.score.total,
+        missedCount: data.score.missed_count,
+        wrongTimingCount: data.score.wrong_timing_count,
+        avgTimingDeviation: data.score.avg_timing_deviation,
+      },
+    };
+    setRecords(prev => [record, ...prev]);
+    return record;
   }
 
   const pages={
