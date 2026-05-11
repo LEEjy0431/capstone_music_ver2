@@ -5,6 +5,19 @@
 
 ---
 
+## 0. 환경 설정 (신규 팀원 온보딩)
+
+| 상태 | 항목 | 담당 | 비고 |
+|------|------|------|------|
+| ✅ | `code/environment.yml` 작성 (Anaconda) | main 관리자 | Mac Apple Silicon 주석 포함 |
+| ✅ | `docs/GUIDE_MAC.md` 작성 | — | Mac 전체 스택 설치 가이드 |
+| ✅ | `docs/AGENT_GUIDELINES.md` 작성 | — | 영역별 수정 규칙, 금지 사항 |
+| 🔴 | 팀원 Mac에서 `conda env create` 검증 | 팀원 각자 | `conda activate capstone_music` 후 테스트 실행 |
+| 🔴 | Apple Silicon TensorFlow 설치 확인 | 팀원 (Mac) | `tensorflow-macos` 수동 교체 필요 |
+| 🟡 | `onnxruntime-silicon` 필요 여부 확인 | main 관리자 | Apple Silicon에서 `onnxruntime` 오류 시 교체 |
+
+---
+
 ## 우선순위 범례
 
 | 기호 | 의미 |
