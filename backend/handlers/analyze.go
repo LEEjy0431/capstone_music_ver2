@@ -16,71 +16,56 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next(w, r)
-	}
-}
-
 // AnalyzeHandler는 POST /api/analyze 요청을 처리한다.
 // multipart/form-data: sheet (xml), audio (wav), lang (ko|en|ja|zh)
 func AnalyzeHandler(w http.ResponseWriter, r *http.Request) {
-	corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			writeJSON(w, http.StatusMethodNotAllowed, models.ErrorResponse{Error: "POST 메서드만 허용됩니다"})
-			return
-		}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, models.ErrorResponse{Error: "POST 메서드만 허용됩니다"})
+		return
+	}
 
-		if err := r.ParseMultipartForm(50 << 20); err != nil {
-			writeJSON(w, http.StatusBadRequest, models.ErrorResponse{Error: "파일 파싱 실패: " + err.Error()})
-			return
-		}
+	if err := r.ParseMultipartForm(50 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, models.ErrorResponse{Error: "파일 파싱 실패: " + err.Error()})
+		return
+	}
 
-		lang := r.FormValue("lang")
-		if lang == "" {
-			lang = "ko"
-		}
+	lang := r.FormValue("lang")
+	if lang == "" {
+		lang = "ko"
+	}
 
-		sheetPath, err := saveUploadedFile(r, "sheet", "*.xml")
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, models.ErrorResponse{Error: "악보 파일 오류: " + err.Error()})
-			return
-		}
-		defer os.Remove(sheetPath)
+	sheetPath, err := saveUploadedFile(r, "sheet", "*.xml")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, models.ErrorResponse{Error: "악보 파일 오류: " + err.Error()})
+		return
+	}
+	defer os.Remove(sheetPath)
 
-		audioPath, err := saveUploadedFile(r, "audio", "*.wav")
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, models.ErrorResponse{Error: "오디오 파일 오류: " + err.Error()})
-			return
-		}
-		defer os.Remove(audioPath)
+	audioPath, err := saveUploadedFile(r, "audio", "*.wav")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, models.ErrorResponse{Error: "오디오 파일 오류: " + err.Error()})
+		return
+	}
+	defer os.Remove(audioPath)
 
-		score, err := services.RunPythonAnalysis(sheetPath, audioPath)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, models.ErrorResponse{Error: "분석 실패: " + err.Error()})
-			return
-		}
+	score, err := services.RunPythonAnalysis(sheetPath, audioPath)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, models.ErrorResponse{Error: "분석 실패: " + err.Error()})
+		return
+	}
 
-		feedback, err := services.GenerateFeedback(score, lang)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, models.ErrorResponse{Error: "피드백 생성 실패: " + err.Error()})
-			return
-		}
+	feedback, err := services.GenerateFeedback(score, lang)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, models.ErrorResponse{Error: "피드백 생성 실패: " + err.Error()})
+		return
+	}
 
-		writeJSON(w, http.StatusOK, models.AnalyzeResponse{
-			Score:    *score,
-			Feedback: *feedback,
-			Grade:    calcGrade(score.Score),
-			Lang:     lang,
-		})
-	})(w, r)
+	writeJSON(w, http.StatusOK, models.AnalyzeResponse{
+		Score:    *score,
+		Feedback: *feedback,
+		Grade:    calcGrade(score.Score),
+		Lang:     lang,
+	})
 }
 
 func calcGrade(score float64) string {
