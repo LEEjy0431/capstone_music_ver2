@@ -374,3 +374,25 @@ python code/main.py --sheet data/piano_sheet_3.xml --audio data/piano_record_3.w
 
 **WAV 파일 업로드 후 분석 실패**
 → 파일이 표준 WAV 포맷(PCM, 모노 또는 스테레오)인지 확인하세요. MP3는 WAV로 변환 후 사용하세요.
+
+**Go 서버 실행 시 `code/main.py` 경로 오류**
+→ `PROJECT_ROOT` 환경변수를 프로젝트 루트로 설정하세요.
+```bash
+# Windows
+set PROJECT_ROOT=D:\Projects\capstone_music_ver2
+
+# macOS / Linux
+export PROJECT_ROOT=/path/to/capstone_music_ver2
+```
+
+---
+
+## 폴더별 상세 문서
+
+각 폴더에 DFD 및 상세 사용 가이드가 포함된 README가 있습니다.
+
+| 폴더 | 설명 | 문서 |
+|------|------|------|
+| `backend/` | Go HTTP 서버 | [backend/README.md](./backend/README.md) |
+| `code/` | Python 분석 파이프라인 | [code/README.md](./code/README.md) |
+| `src/` | React 프론트엔드 | [src/README.md](./src/README.md) |
