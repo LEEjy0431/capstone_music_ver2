@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/record.dart';
 import '../providers/record_provider.dart';
+import '../services/feedback_stream_service.dart';
 import '../theme.dart';
 import '../widgets/feedback_card.dart';
 import '../widgets/score_bar.dart';
@@ -20,6 +21,11 @@ class _AnalysisPageState extends State<AnalysisPage> {
   PlatformFile? _sheetFile;
   String _lang = 'ko';
   PracticeRecord? _result;
+
+  // SSE 스트리밍 상태
+  String _streamText = '';         // 누적 텍스트 (청크)
+  Feedback? _streamedFeedback;     // done 이벤트 수신 후 완성된 피드백
+  bool _streaming = false;
 
   static const _langs = [
     ('ko', '한국어'),
@@ -49,6 +55,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
     if (_audioFile == null || _sheetFile == null) return;
     final provider = context.read<RecordProvider>();
 
+    // 1단계: Python 분석 + 채점 (blocking)
     final record = await provider.analyze(
       sheetBytes: _sheetFile!.bytes!,
       sheetName: _sheetFile!.name,
@@ -58,15 +65,74 @@ class _AnalysisPageState extends State<AnalysisPage> {
       lang: _lang,
     );
 
-    if (record != null) {
-      setState(() => _result = record);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(provider.error ?? '분석 실패'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    if (record == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(provider.error ?? '분석 실패'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _result = record;
+      _streamText = '';
+      _streamedFeedback = null;
+    });
+
+    // 2단계: SSE 스트리밍으로 GPT 피드백 수신
+    await _streamFeedback(record.scoreDetail);
+  }
+
+  Future<void> _streamFeedback(ScoreDetail score) async {
+    setState(() {
+      _streaming = true;
+      _streamText = '';
+      _streamedFeedback = null;
+    });
+
+    final buffer = StringBuffer();
+
+    try {
+      await for (final event in FeedbackStreamService.stream(
+        score: score,
+        lang: _lang,
+      )) {
+        if (!mounted) break;
+
+        switch (event.type) {
+          case FeedbackEventType.chunk:
+            buffer.write(event.text ?? '');
+            setState(() => _streamText = buffer.toString());
+
+          case FeedbackEventType.done:
+            setState(() {
+              _streamedFeedback = event.feedback;
+              _streaming = false;
+            });
+
+          case FeedbackEventType.error:
+            setState(() => _streaming = false);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('피드백 오류: ${event.error}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _streaming = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('스트림 오류: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -88,9 +154,10 @@ class _AnalysisPageState extends State<AnalysisPage> {
             _langSelector(),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: (_audioFile != null && _sheetFile != null && !analyzing)
-                  ? _analyze
-                  : null,
+              onPressed:
+                  (_audioFile != null && _sheetFile != null && !analyzing && !_streaming)
+                      ? _analyze
+                      : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.gold,
                 foregroundColor: Colors.black,
@@ -98,21 +165,66 @@ class _AnalysisPageState extends State<AnalysisPage> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
-              child: analyzing
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.black))
+              child: (analyzing || _streaming)
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.black)),
+                        const SizedBox(width: 8),
+                        Text(analyzing ? '분석 중...' : 'GPT 피드백 생성 중...'),
+                      ],
+                    )
                   : const Text('분석 시작하기',
                       style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             if (_result != null) ...[
               const SizedBox(height: 24),
               _resultCard(_result!),
-              const SizedBox(height: 16),
-              FeedbackCard(feedback: _result!.feedback),
             ],
+            // SSE 스트리밍: 텍스트 누적 표시
+            if (_streaming && _streamText.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _streamingCard(),
+            ],
+            // 스트리밍 완료: 구조화 피드백 카드
+            if (_streamedFeedback != null) ...[
+              const SizedBox(height: 16),
+              FeedbackCard(feedback: _streamedFeedback!),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// GPT 토큰이 도착하는 동안 텍스트를 실시간으로 표시하는 카드
+  Widget _streamingCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const SizedBox(
+                    height: 14,
+                    width: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppTheme.gold)),
+                const SizedBox(width: 8),
+                const Text('GPT 피드백 생성 중...',
+                    style: TextStyle(
+                        color: AppTheme.gold, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(_streamText,
+                style: Theme.of(context).textTheme.bodyMedium),
           ],
         ),
       ),
@@ -127,27 +239,22 @@ class _AnalysisPageState extends State<AnalysisPage> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           border: Border.all(
-            color: file != null
-                ? AppTheme.gold
-                : Theme.of(context).dividerColor,
+            color: file != null ? AppTheme.gold : Theme.of(context).dividerColor,
             width: file != null ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            Icon(
-              isAudio ? Icons.audio_file : Icons.music_note,
-              color: file != null ? AppTheme.gold : null,
-            ),
+            Icon(isAudio ? Icons.audio_file : Icons.music_note,
+                color: file != null ? AppTheme.gold : null),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 file?.name ?? label,
                 style: TextStyle(
                     color: file != null ? AppTheme.gold : null,
-                    fontWeight:
-                        file != null ? FontWeight.bold : FontWeight.normal),
+                    fontWeight: file != null ? FontWeight.bold : FontWeight.normal),
               ),
             ),
             Icon(Icons.upload_file,
@@ -219,8 +326,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
             const SizedBox(height: 16),
             ScoreBar(
               label: '음정 정확도',
-              value:
-                  '${r.scoreDetail.correct} / ${r.scoreDetail.total}',
+              value: '${r.scoreDetail.correct} / ${r.scoreDetail.total}',
               fraction: r.scoreDetail.total > 0
                   ? r.scoreDetail.correct / r.scoreDetail.total
                   : 0,
@@ -237,8 +343,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
               label: '박자 오류',
               value: '${r.scoreDetail.wrongTimingCount}개',
               fraction: r.scoreDetail.total > 0
-                  ? 1 -
-                      r.scoreDetail.wrongTimingCount / r.scoreDetail.total
+                  ? 1 - r.scoreDetail.wrongTimingCount / r.scoreDetail.total
                   : 1,
               color: Colors.orangeAccent,
             ),

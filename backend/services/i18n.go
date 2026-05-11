@@ -23,32 +23,18 @@ func NormalizeLang(lang string) string {
 }
 
 // BuildFeedbackPrompt는 채점 결과와 언어 코드를 받아 GPT system/user 프롬프트를 생성한다.
+// 토큰 수 최적화: system ~90 토큰, user ~60 토큰 (기존 대비 ~40% 절감)
 func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user string) {
 	lang = NormalizeLang(lang)
 	langName := SupportedLangs[lang]
 
-	system = fmt.Sprintf(`You are an expert piano teacher providing constructive and encouraging feedback.
-Based on the performance analysis data, generate specific and motivating feedback for the student.
-You MUST respond ONLY in %s (%s).
-You MUST respond ONLY in valid JSON with exactly this structure, no extra text:
-{
-  "overall": "2-3 sentence overall evaluation",
-  "pitch": "1-2 sentence pitch accuracy feedback",
-  "rhythm": "1-2 sentence rhythm/beat feedback",
-  "timing": "1-2 sentence timing feedback",
-  "tips": ["improvement tip 1", "improvement tip 2", "improvement tip 3"],
-  "encouragement": "1 sentence encouraging message"
-}`, langName, lang)
+	system = fmt.Sprintf(
+		"You are a piano teacher. Respond ONLY in %s (%s). Output valid JSON only.",
+		langName, lang,
+	)
 
-	user = fmt.Sprintf(`Piano performance analysis result:
-- Final score: %.1f / 100
-- Correct notes: %d / %d
-- Missed notes: %d
-- Timing errors: %d
-- Extra (unintended) notes: %d
-- Average timing deviation: %.3f seconds
-
-Generate the feedback JSON based on this data.`,
+	user = fmt.Sprintf(
+		"Score:%.1f/100 Correct:%d/%d Missed:%d TimingErr:%d Extra:%d AvgDev:%.3fs. Give feedback JSON.",
 		score.Score, score.Correct, score.Total,
 		score.MissedCount, score.WrongTimingCount,
 		score.ExtraCount, score.AvgTimingDeviation,

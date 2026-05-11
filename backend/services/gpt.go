@@ -21,6 +21,8 @@ type gptRequest struct {
 	Messages       []gptMessage   `json:"messages"`
 	ResponseFormat map[string]any `json:"response_format"`
 	Temperature    float64        `json:"temperature"`
+	MaxTokens      int            `json:"max_tokens,omitempty"`
+	Stream         bool           `json:"stream,omitempty"`
 }
 
 type gptMessage struct {
@@ -54,8 +56,9 @@ func GenerateFeedback(score *models.ScoreResult, lang string) (*models.FeedbackR
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		ResponseFormat: map[string]any{"type": "json_object"},
-		Temperature:    0.7,
+		ResponseFormat: feedbackJSONSchema,
+		Temperature:    0.3,
+		MaxTokens:      400,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("요청 직렬화 실패: %w", err)

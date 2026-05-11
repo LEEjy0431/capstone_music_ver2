@@ -30,6 +30,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/analyze", handlers.AnalyzeHandler)
+	mux.HandleFunc("/api/feedback/stream", handlers.FeedbackStreamHandler)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintln(w, `{"status":"ok"}`)
