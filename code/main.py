@@ -15,19 +15,35 @@ def run_analysis(sheet_path, audio_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="피아노 연주 자동 평가 시스템")
-    parser.add_argument("--sheet", default="data/piano_sheet_3.xml", help="악보 파일 경로 (MusicXML)")
-    parser.add_argument("--audio", default="data/piano_record_3.wav", help="연주 오디오 파일 경로 (WAV)")
-    parser.add_argument("--json", dest="json_mode", action="store_true", help="결과를 JSON으로 출력 (Go 연동용)")
+    parser.add_argument("--sheet",    default="data/piano_sheet_3.xml", help="악보 파일 경로 (MusicXML)")
+    parser.add_argument("--audio",    default="data/piano_record_3.wav", help="연주 오디오 파일 경로 (WAV)")
+    parser.add_argument("--lang",     default="ko", choices=["ko", "en", "ja", "zh"], help="GPT 피드백 언어")
+    parser.add_argument("--json",     dest="json_mode",     action="store_true", help="채점 결과만 JSON 출력 (Go 연동용)")
+    parser.add_argument("--feedback", dest="feedback_mode", action="store_true", help="채점 + GPT 피드백 JSON 출력")
     args = parser.parse_args()
 
+    # ── JSON 모드 (Go subprocess 연동) ──────────────────────────────────────
     if args.json_mode:
-        # Go subprocess가 stdout에서 JSON만 읽으므로 다른 출력 없이 JSON만 출력
         try:
             result = run_analysis(args.sheet, args.audio)
             print(json.dumps(result, ensure_ascii=False))
         except Exception as e:
             print(json.dumps({"error": str(e)}, ensure_ascii=False))
             sys.exit(1)
+
+    # ── 피드백 모드 (채점 + GPT 피드백 통합 출력) ────────────────────────────
+    elif args.feedback_mode:
+        try:
+            from module4 import generate_feedback
+            score = run_analysis(args.sheet, args.audio)
+            feedback = generate_feedback(score, lang=args.lang)
+            output = {"score": score, "feedback": feedback, "lang": args.lang}
+            print(json.dumps(output, ensure_ascii=False))
+        except Exception as e:
+            print(json.dumps({"error": str(e)}, ensure_ascii=False))
+            sys.exit(1)
+
+    # ── 콘솔 모드 (기존 출력) ────────────────────────────────────────────────
     else:
         print("=== 피아노 연주 자동 평가 시스템 ===\n")
 

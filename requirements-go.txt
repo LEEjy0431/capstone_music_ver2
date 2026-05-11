@@ -1,0 +1,17 @@
+# ============================================================
+# Go 백엔드 스택
+# Go 의존성은 go.mod / go.sum 으로 관리됩니다.
+# 설치: cd backend && go mod tidy
+# 실행: cd backend && go run main.go
+# ============================================================
+#
+# 주요 의존성 (go.mod 참조):
+#   module  capstone/backend
+#   go      1.24.7
+#
+# 환경변수:
+#   OPENAI_API_KEY  OpenAI API 키 (필수)
+#   PORT            서버 포트 (기본값: 8080)
+#   PROJECT_ROOT    프로젝트 루트 경로 (go run 시 필수)
+#                   예) export PROJECT_ROOT=/path/to/capstone_music_ver2
+# ============================================================

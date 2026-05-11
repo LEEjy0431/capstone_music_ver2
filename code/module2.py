@@ -6,6 +6,7 @@ import soundfile as sf
 import pretty_midi
 import tempfile
 import os
+import sys
 
 from piano_transcription_inference import PianoTranscription, sample_rate
 
@@ -84,7 +85,7 @@ def extract_notes_from_audio(audio_path, bpm=120, quantize=True):
         return played_notes
 
     except Exception as e:
-        print(f"[Module 2 Error] piano_transcription_inference 처리 중 문제 발생: {e}")
+        print(f"[Module 2 Error] piano_transcription_inference 처리 중 문제 발생: {e}", file=sys.stderr)
         return played_notes
 
 

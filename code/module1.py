@@ -1,6 +1,7 @@
 from music21 import converter, note, chord, tempo
 import xml.etree.ElementTree as ET
 import numpy as np
+import sys
 
 def extract_notes_from_musicxml(xml_path):
     try:
@@ -23,7 +24,7 @@ def extract_notes_from_musicxml(xml_path):
                     bpm = float(sound.get('tempo'))
                     break
 
-        print(f"-> BPM 감지: {bpm}")
+        print(f"-> BPM 감지: {bpm}", file=sys.stderr)
         seconds_per_quarter = 60.0 / bpm
         expected_notes = []
 
@@ -68,7 +69,7 @@ def extract_notes_from_musicxml(xml_path):
         return expected_notes
 
     except Exception as e:
-        print(f"[모듈 1 오류] MusicXML 파일을 읽는 중 문제 발생: {e}")
+        print(f"[모듈 1 오류] MusicXML 파일을 읽는 중 문제 발생: {e}", file=sys.stderr)
         return []
 
 
@@ -79,5 +80,5 @@ def extract_onset_sequence(xml_path):
             return np.array([]), np.array([])
         return np.array([n['start'] for n in notes]), np.array([n['pitch'] for n in notes])
     except Exception as e:
-        print(f"[모듈 1 오류] onset 추출 중 문제 발생: {e}")
+        print(f"[모듈 1 오류] onset 추출 중 문제 발생: {e}", file=sys.stderr)
         return np.array([]), np.array([])

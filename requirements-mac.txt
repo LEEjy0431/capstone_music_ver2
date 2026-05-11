@@ -1,0 +1,7 @@
+# ============================================================
+# macOS (Apple Silicon) 전용 오버라이드
+# 설치: pip install -r requirements.txt -r requirements-mac.txt
+# ============================================================
+
+# tensorflow 대신 macOS 전용 패키지 사용
+tensorflow-macos==2.16.2
