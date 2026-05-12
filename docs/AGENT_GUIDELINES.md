@@ -1,4 +1,4 @@
-# Agent Guidelines — 피아노 연주 자동 평가 시스템
+# Agent Guideline
 
 > AI 에이전트(Claude Code 등)가 이 저장소를 수정할 때 반드시 따라야 할 규칙과 컨텍스트.  
 > 팀 개발 환경: macOS (Apple Silicon) + Anaconda, Go, Flutter
