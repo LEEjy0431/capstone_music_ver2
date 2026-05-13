@@ -222,4 +222,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 piano_transcription_inference_data/
+piano_transcription_inference_data.zip
 *.pth
