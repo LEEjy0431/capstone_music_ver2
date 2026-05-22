@@ -25,12 +25,13 @@ type FeedbackResult struct {
 	Encouragement string   `json:"encouragement"`
 }
 
-// /api/analyze 최종 응답
+// /api/analyze 응답 — 채점 결과 + 세션 ID
+// GPT 피드백은 GET /api/feedback/stream?session_id=<id> 로 별도 수신한다.
 type AnalyzeResponse struct {
-	Score    ScoreResult    `json:"score"`
-	Feedback FeedbackResult `json:"feedback"`
-	Grade    string         `json:"grade"`
-	Lang     string         `json:"lang"`
+	Score     ScoreResult `json:"score"`
+	Grade     string      `json:"grade"`
+	Lang      string      `json:"lang"`
+	SessionID string      `json:"session_id"`
 }
 
 // 에러 응답
