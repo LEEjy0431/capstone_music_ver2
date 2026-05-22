@@ -1,6 +1,6 @@
 # TODO — 피아노 연주 자동 평가 시스템
 
-> 마지막 업데이트: 2026-05-11  
+> 마지막 업데이트: 2026-05-22  
 > 브랜치: `kts`
 
 ---
@@ -29,14 +29,13 @@
 
 ---
 
-## 1. Flutter 앱
+## 1. Flutter 앱 (메인 클라이언트)
 
 ### 1-1. 환경 / 빌드
 
 | 상태 | 항목 | 비고 |
 |------|------|------|
 | 🔴 | `flutter pub get` 실행 및 의존성 충돌 확인 | `pubspec.yaml` 기준 |
-| 🔴 | Web 빌드 검증 (`flutter build web`) | `build/web/` 산출물 확인 |
 | 🔴 | Android APK 빌드 검증 (`flutter build apk`) | 에뮬레이터 또는 실기기 |
 | 🟡 | API_BASE 환경 분리 (개발 / 운영) | `--dart-define` 활용 |
 | 🟡 | 앱 아이콘 / 스플래시 화면 설정 | `flutter_launcher_icons` 패키지 |
@@ -45,7 +44,10 @@
 
 | 상태 | 항목 | 비고 |
 |------|------|------|
-| 🔴 | 분석 결과 로컬 저장 | 현재 메모리만 → `shared_preferences` 직렬화 |
+| ✅ | `POST /api/analyze` 연동 — 채점 결과 + `session_id` 수신 | Sprint 6 완료 |
+| ✅ | `GET /api/feedback/stream` SSE 연동 — `session_id` 방식 | Sprint 6 완료 |
+| ✅ | SSE `done` 이벤트 수신 후 provider 피드백 동기화 | Sprint 6 완료 |
+| 🔴 | 분석 기록 로컬 저장 | 현재 메모리만 → `shared_preferences` 직렬화 |
 | 🟡 | 앱 재시작 시 기록 복원 | JSON 인코딩 후 저장 |
 | 🟡 | 파일 선택 오류 처리 (취소, 용량 초과) | try-catch + 사용자 안내 |
 | 🟡 | 분석 중 취소 기능 | HTTP 요청 abort |
@@ -67,6 +69,9 @@
 
 | 상태 | 항목 | 비고 |
 |------|------|------|
+| ✅ | `POST /api/analyze` — 채점 결과 + `session_id` 즉시 반환 | Sprint 6 완료 |
+| ✅ | `GET /api/feedback/stream` — `session_id` 조회 방식으로 교체 | Sprint 6 완료 |
+| ✅ | `backend/services/store.go` — 세션 스토어 (TTL 5분) 구현 | Sprint 6 완료 |
 | 🔴 | 환경변수 `.env` 자동 로딩 (`godotenv`) | 현재 수동 export 필요 |
 | 🟡 | 파일 크기 제한 명시 (현재 50MB) | 필요 시 조정 |
 | 🟡 | 분석 타임아웃 설정 | Python 실행 > 3분 방어 |

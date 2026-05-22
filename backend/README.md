@@ -11,118 +11,106 @@ backend/
 ├── main.go                  # 서버 진입점, 라우팅
 ├── go.mod                   # Go 모듈 정의
 ├── handlers/
-│   └── analyze.go           # POST /api/analyze 핸들러
+│   ├── analyze.go           # POST /api/analyze 핸들러 (채점 + session_id 반환)
+│   └── feedback_stream.go   # GET /api/feedback/stream 핸들러 (SSE 피드백)
 ├── models/
 │   └── types.go             # 공유 타입 정의
 └── services/
     ├── python_runner.go     # Python subprocess 실행
-    ├── gpt.go               # OpenAI API 호출
-    └── i18n.go              # 언어별 프롬프트 생성
+    ├── store.go             # 세션 스토어 (sync.Map, TTL 5분)
+    ├── gpt.go               # OpenAI API 동기 호출
+    ├── gpt_stream.go        # OpenAI API SSE 스트리밍 호출
+    ├── i18n.go              # 언어별 프롬프트 생성
+    └── i18n_schema.go       # GPT JSON Schema (strict mode)
 ```
 
 ---
 
 ## DFD (Data Flow Diagram)
 
-### Level 1 — 요청 처리 흐름
+### Level 1 — 요청 처리 흐름 (2단계 분리)
 
 ```
-Client (React)
+Flutter 앱
     │
-    │  POST /api/analyze
-    │  multipart/form-data
-    │  { sheet: File, audio: File, lang: string }
+    │  ① POST /api/analyze
+    │    multipart/form-data { sheet, audio, lang }
     ▼
-┌──────────────────────────────────────────────────────────────┐
-│  handlers/analyze.go                                         │
-│                                                              │
-│  1. ParseMultipartForm()                                     │
-│     ├─ sheet  → saveUploadedFile() → /tmp/xxx.xml            │
-│     ├─ audio  → saveUploadedFile() → /tmp/xxx.wav            │
-│     └─ lang   → "ko" | "en" | "ja" | "zh"                   │
-│                                                              │
-│  2. services.RunPythonAnalysis(sheetPath, audioPath)   ──┐   │
-│  3. services.GenerateFeedback(score, lang)             ──┤   │
-│  4. calcGrade(score.Score)                                │   │
-│  5. json.Encode(AnalyzeResponse)                          │   │
-└───────────────────────────────────────────────────────────┼──┘
-                                                            │
-                    ┌───────────────────────────────────────┘
-                    │
-        ┌───────────▼────────────┐    ┌────────────────────────┐
-        │  python_runner.go      │    │  gpt.go + i18n.go      │
-        │                        │    │                        │
-        │  projectRoot()         │    │  BuildFeedbackPrompt() │
-        │  └─ PROJECT_ROOT env   │    │  └─ lang → system/user │
-        │     또는 os.Executable │    │     prompt 생성        │
-        │                        │    │                        │
-        │  exec.Command(         │    │  OpenAI API 호출       │
-        │   python3 main.py      │    │  model: gpt-4o-mini    │
-        │   --sheet --audio      │    │  response_format: JSON │
-        │   --json               │    │                        │
-        │  )                     │    │  FeedbackResult 파싱   │
-        │                        │    │  { overall, pitch,     │
-        │  stdout → JSON 파싱    │    │    rhythm, timing,     │
-        │  → ScoreResult         │    │    tips[], encourage } │
-        └────────────────────────┘    └────────────────────────┘
-                    │                              │
-                    └──────────────┬───────────────┘
-                                   ▼
-                           AnalyzeResponse
-                    { score, feedback, grade, lang }
-                                   │
-                                   ▼
-                            Client (React)
+┌──────────────────────────────────────────┐
+│  handlers/analyze.go                     │
+│                                          │
+│  1. ParseMultipartForm()                 │
+│  2. saveUploadedFile() → /tmp/           │
+│  3. RunPythonAnalysis() → ScoreResult    │
+│  4. newSessionID() + StoreScore()        │
+│  5. calcGrade()                          │
+│  6. AnalyzeResponse { score, grade,      │
+│                       lang, session_id } │
+└──────────────────────────────────────────┘
+    │
+    │  { score, grade, lang, session_id }
+    ▼
+Flutter 앱 (점수 즉시 표시)
+    │
+    │  ② GET /api/feedback/stream?session_id=<id>&lang=ko
+    ▼
+┌──────────────────────────────────────────┐
+│  handlers/feedback_stream.go             │
+│                                          │
+│  1. GetScore(session_id) → ScoreResult   │
+│     └─ 만료/미존재 시 404               │
+│  2. GenerateFeedbackStream()             │
+│     ├─ BuildFeedbackPrompt()             │
+│     ├─ OpenAI stream: true               │
+│     ├─ event: chunk  (텍스트 조각)       │
+│     └─ event: done   (완성 JSON)         │
+└──────────────────────────────────────────┘
+    │
+    │  SSE 스트리밍
+    ▼
+Flutter 앱 (피드백 실시간 표시)
 ```
 
 ### Level 2 — 데이터 타입 흐름
 
 ```
+① POST /api/analyze
+─────────────────────────────────────────────
 multipart Form
-    │
-    ├─[sheet: File]──► os.CreateTemp("*.xml") ──► sheetPath (string)
-    ├─[audio: File]──► os.CreateTemp("*.wav") ──► audioPath (string)
-    └─[lang: string]─────────────────────────────► lang (string)
-           │
-           ▼
-  RunPythonAnalysis(sheetPath, audioPath)
-           │
-           │  stdout (JSON)
-           ▼
-  ScoreResult {
-    score               float64   // 0~100점
-    correct             int       // 정확히 연주한 음표 수
-    total               int       // 전체 음표 수
-    missed_count        int       // 누락 음표 수
-    wrong_timing_count  int       // 박자 오류 수
-    extra_count         int       // 추가 음표 수
-    avg_timing_deviation float64  // 평균 타이밍 편차(초)
-    missed_notes        []any
-    wrong_timing_notes  []any
-    extra_notes         []any
-  }
-           │
-           ▼
-  GenerateFeedback(score, lang)
-           │
-           │  OpenAI API
-           ▼
-  FeedbackResult {
-    overall        string
-    pitch          string
-    rhythm         string
-    timing         string
-    tips           []string
-    encouragement  string
-  }
-           │
-           ▼
-  AnalyzeResponse {
-    score    ScoreResult
-    feedback FeedbackResult
-    grade    string    // A / A- / B+ / B / C+ / C
-    lang     string
-  }
+    ├─[sheet: File] → os.CreateTemp("*.xml") → sheetPath
+    ├─[audio: File] → os.CreateTemp("*.wav") → audioPath
+    └─[lang: string] ─────────────────────── → lang
+
+RunPythonAnalysis(sheetPath, audioPath)  →  ScoreResult {
+    score, correct, total,
+    missed_count, wrong_timing_count, extra_count,
+    avg_timing_deviation, missed_notes[], ...
+}
+
+newSessionID()  →  "a3f8c2d1..." (crypto/rand 16바이트)
+StoreScore(sessionID, ScoreResult)  →  메모리 저장 (TTL 5분)
+
+AnalyzeResponse {
+    score     ScoreResult
+    grade     string    // A / A- / B+ / B / C+ / C
+    lang      string
+    session_id string   // 피드백 스트리밍에 사용
+}
+
+② GET /api/feedback/stream?session_id=<id>&lang=ko
+─────────────────────────────────────────────
+GetScore(sessionID)  →  ScoreResult (만료 시 404)
+
+BuildFeedbackPrompt(score, lang)  →  system + user prompt
+feedbackJSONSchema (strict)       →  OpenAI 구조화 출력 강제
+
+SSE 이벤트 흐름:
+    event: chunk  data: {"type":"chunk","text":"전반적으로..."}
+    event: chunk  data: {"type":"chunk","text":"음정 정확도..."}
+    event: done   data: {"type":"done","feedback":{
+                      overall, pitch, rhythm, timing,
+                      tips[], encouragement
+                  }}
 ```
 
 ---
@@ -259,24 +247,52 @@ OPENAI_API_KEY=sk-... ./server
     "extra_count": 2,
     "avg_timing_deviation": 0.087
   },
-  "feedback": {
-    "overall": "...",
-    "pitch": "...",
-    "rhythm": "...",
-    "timing": "...",
-    "tips": ["...", "...", "..."],
-    "encouragement": "..."
-  },
   "grade": "B+",
-  "lang": "ko"
+  "lang": "ko",
+  "session_id": "a3f8c2d1e4b5f6a7b8c9d0e1f2a3b4c5"
 }
 ```
+
+> `session_id` 는 5분간 유효합니다. 이 값을 `GET /api/feedback/stream` 에 전달하세요.
 
 **Response 4xx / 5xx**
 
 ```json
 { "error": "오류 메시지" }
 ```
+
+---
+
+### `GET /api/feedback/stream`
+
+**Query Parameters**
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| `session_id` | string | ✅ | `POST /api/analyze` 응답의 `session_id` (유효시간 5분) |
+| `lang` | string | | 피드백 언어 (`ko`/`en`/`ja`/`zh`), 기본값 `ko` |
+
+**Response** — `text/event-stream` (SSE)
+
+```
+event: chunk
+data: {"type":"chunk","text":"전반적으로 안정적인 연주입니다"}
+
+event: chunk
+data: {"type":"chunk","text":"..."}
+
+event: done
+data: {"type":"done","feedback":{"overall":"...","pitch":"...","rhythm":"...","timing":"...","tips":["..."],"encouragement":"..."}}
+```
+
+**오류 응답**
+
+```
+event: error
+data: {"type":"error","error":"세션을 찾을 수 없습니다 (만료되었거나 존재하지 않음)"}
+```
+
+---
 
 ### `GET /health`
 

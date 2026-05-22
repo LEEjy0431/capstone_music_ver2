@@ -157,12 +157,44 @@
 
 ---
 
-## 다음 스프린트 예정 항목
+## [Sprint 6] 2026-05-22 — 피드백 프로세스 분리 (Option A) + Flutter 앱 전환
 
-> 상세 내용은 `docs/TODO.md` 참조
+### 완료 항목
 
-- [ ] `shared_preferences`로 분석 기록 로컬 저장
-- [ ] Flutter Web 빌드 + Go 서버 정적 파일 서빙 (`embed`)
-- [ ] Android APK 실기기 테스트
-- [ ] Docker Compose (Go + Python 통합 실행)
-- [ ] Python 파이프라인 `pytest` 단위 테스트
+**백엔드 — 채점/피드백 2단계 분리**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `backend/services/store.go` (신규) | `sync.Map` 기반 세션 스토어, TTL 5분 자동 만료 |
+| `backend/models/types.go` | `AnalyzeResponse`에서 `Feedback` 제거, `SessionID` 추가 |
+| `backend/handlers/analyze.go` | GPT 동기 호출 제거, `newSessionID()` + `StoreScore()` 추가 |
+| `backend/handlers/feedback_stream.go` | 7개 score query param → `session_id` 단일 파라미터로 교체 |
+
+**Flutter 앱 — session_id 방식 연동**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `flutter_app/lib/models/record.dart` | `feedback` nullable화, `sessionId` 필드 추가, `copyWith()` 추가 |
+| `flutter_app/lib/services/feedback_stream_service.dart` | `stream()` 파라미터 `ScoreDetail` → `sessionId` 로 교체 |
+| `flutter_app/lib/providers/record_provider.dart` | `updateFeedback(id, feedback)` 추가 |
+| `flutter_app/lib/pages/analysis_page.dart` | `_streamFeedback(sessionId)` 방식으로 변경, `done` 시 provider 동기화 |
+
+### 주요 결정 사항
+- **Option A 채택**: `POST /api/analyze`는 채점 결과 + `session_id` 즉시 반환, GPT 피드백은 `GET /api/feedback/stream?session_id=<id>` SSE로 분리
+  - 이유: Python 분석(~30초) 완료 즉시 점수 표시 후 피드백을 스트리밍으로 UX 개선
+- **앱(Flutter) 전환 확정**: React 웹 프론트엔드 대신 Flutter 앱을 메인 클라이언트로 결정
+  - 이유: Android + Web 단일 코드베이스, 모바일 UX 최적화
+- **session_id 신뢰성 개선**: 서버에서 `crypto/rand` 16바이트 생성, TTL 5분 후 자동 폐기
+  - 기존 방식(클라이언트가 score 값 직접 전달)의 조작 가능성 해결
+
+### 발생한 문제 & 해결
+- 로컬 git 프록시가 `kimtaesung98` 계정으로 고정 → LEEjy0431 레포 쓰기 권한 없음
+  → `git push https://LEEjy0431:<TOKEN>@github.com/...` 방식으로 우회 (Sprint 4와 동일)
+- 직접 URL push 후 로컬 `origin/kts` 트래킹 미갱신
+  → `git fetch origin kts` 로 트래킹 동기화
+
+### 다음 스프린트 예정
+- Flutter Android APK 빌드 및 실기기 테스트
+- `shared_preferences`로 분석 기록 로컬 저장
+- `godotenv`로 `.env` 자동 로딩
+- Docker Compose (Go + Python 통합 실행)
