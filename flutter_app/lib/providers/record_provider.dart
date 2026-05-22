@@ -23,6 +23,8 @@ class RecordProvider extends ChangeNotifier {
     return _records.map((r) => r.score).reduce((a, b) => a > b ? a : b);
   }
 
+  /// POST /api/analyze 호출 — 채점 결과와 session_id를 포함한 레코드를 반환한다.
+  /// GPT 피드백은 포함되지 않으며, updateFeedback() 으로 별도 설정한다.
   Future<PracticeRecord?> analyze({
     required List<int> sheetBytes,
     required String sheetName,
@@ -53,5 +55,13 @@ class RecordProvider extends ChangeNotifier {
       _analyzing = false;
       notifyListeners();
     }
+  }
+
+  /// SSE 스트리밍 완료 후 특정 레코드에 피드백을 설정한다.
+  void updateFeedback(int id, Feedback feedback) {
+    final index = _records.indexWhere((r) => r.id == id);
+    if (index == -1) return;
+    _records[index] = _records[index].copyWith(feedback: feedback);
+    notifyListeners();
   }
 }

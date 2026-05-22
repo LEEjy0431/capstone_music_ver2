@@ -83,11 +83,13 @@ class _AnalysisPageState extends State<AnalysisPage> {
       _streamedFeedback = null;
     });
 
-    // 2단계: SSE 스트리밍으로 GPT 피드백 수신
-    await _streamFeedback(record.scoreDetail);
+    // 2단계: session_id로 SSE 스트리밍 GPT 피드백 수신
+    if (record.sessionId != null) {
+      await _streamFeedback(record.sessionId!);
+    }
   }
 
-  Future<void> _streamFeedback(ScoreDetail score) async {
+  Future<void> _streamFeedback(String sessionId) async {
     setState(() {
       _streaming = true;
       _streamText = '';
@@ -98,7 +100,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
 
     try {
       await for (final event in FeedbackStreamService.stream(
-        score: score,
+        sessionId: sessionId,
         lang: _lang,
       )) {
         if (!mounted) break;
@@ -113,6 +115,12 @@ class _AnalysisPageState extends State<AnalysisPage> {
               _streamedFeedback = event.feedback;
               _streaming = false;
             });
+            if (event.feedback != null && _result != null) {
+              context.read<RecordProvider>().updateFeedback(
+                    _result!.id,
+                    event.feedback!,
+                  );
+            }
 
           case FeedbackEventType.error:
             setState(() => _streaming = false);
