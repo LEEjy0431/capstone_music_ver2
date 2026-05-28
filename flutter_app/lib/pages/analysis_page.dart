@@ -20,13 +20,12 @@ class _AnalysisPageState extends State<AnalysisPage> {
   PlatformFile? _audioFile;
   PlatformFile? _sheetFile;
   String _lang = 'ko';
+  PracticeRecord? _result;
 
-  // 분석 결과 상태
-  PracticeRecord? _record;   // Step1 완료 후 점수 보유
-  String _streamText = '';   // Step2 GPT 토큰 누적
-  Feedback? _feedback;       // Step2 done 이벤트 수신 후 완성
+  // SSE 스트리밍 상태
+  String _streamText = '';         // 누적 텍스트 (청크)
+  Feedback? _streamedFeedback;     // done 이벤트 수신 후 완성된 피드백
   bool _streaming = false;
-  String? _streamError;
 
   static const _langs = [
     ('ko', '한국어'),
@@ -35,7 +34,6 @@ class _AnalysisPageState extends State<AnalysisPage> {
     ('zh', '中文'),
   ];
 
-  // ── 파일 선택 ──────────────────────────────────────────────
   Future<void> _pickFile(bool isAudio) async {
     final ext = isAudio ? ['wav'] : ['xml', 'musicxml'];
     final res = await FilePicker.platform.pickFiles(
@@ -53,21 +51,11 @@ class _AnalysisPageState extends State<AnalysisPage> {
     });
   }
 
-  // ── 메인 분석 흐름 ─────────────────────────────────────────
   Future<void> _analyze() async {
     if (_audioFile == null || _sheetFile == null) return;
-
-    // UI 초기화
-    setState(() {
-      _record = null;
-      _streamText = '';
-      _feedback = null;
-      _streamError = null;
-    });
-
     final provider = context.read<RecordProvider>();
 
-    // ── Step 1: Python 파이프라인 (채점만, ~10~30s) ──────────
+    // 1단계: Python 분석 + 채점 (blocking)
     final record = await provider.analyze(
       sheetBytes: _sheetFile!.bytes!,
       sheetName: _sheetFile!.name,
@@ -79,36 +67,40 @@ class _AnalysisPageState extends State<AnalysisPage> {
 
     if (record == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(provider.error ?? '분석 실패'),
-          backgroundColor: Colors.red,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(provider.error ?? '분석 실패'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
       return;
     }
 
-    // 점수 카드 즉시 표시
-    setState(() => _record = record);
+    setState(() {
+      _result = record;
+      _streamText = '';
+      _streamedFeedback = null;
+    });
 
-    // ── Step 2: GPT 피드백 SSE 스트리밍 (~0.5s 후 첫 토큰) ──
-    await _streamFeedback(record);
+    // 2단계: session_id로 SSE 스트리밍 GPT 피드백 수신
+    if (record.sessionId != null) {
+      await _streamFeedback(record.sessionId!);
+    }
   }
 
-  // ── SSE 피드백 스트리밍 ────────────────────────────────────
-  Future<void> _streamFeedback(PracticeRecord record) async {
+  Future<void> _streamFeedback(String sessionId) async {
     setState(() {
       _streaming = true;
       _streamText = '';
-      _feedback = null;
-      _streamError = null;
+      _streamedFeedback = null;
     });
 
-    final provider = context.read<RecordProvider>();
     final buffer = StringBuffer();
 
     try {
       await for (final event in FeedbackStreamService.stream(
-        score: record.scoreDetail,
+        sessionId: sessionId,
         lang: _lang,
       )) {
         if (!mounted) break;
@@ -119,32 +111,39 @@ class _AnalysisPageState extends State<AnalysisPage> {
             setState(() => _streamText = buffer.toString());
 
           case FeedbackEventType.done:
-            final fb = event.feedback!;
-            // Provider 레코드에 피드백 저장 (기록 탭 반영)
-            provider.updateFeedback(record.id, fb);
             setState(() {
-              _feedback = fb;
+              _streamedFeedback = event.feedback;
               _streaming = false;
             });
+            if (event.feedback != null && _result != null) {
+              context.read<RecordProvider>().updateFeedback(
+                    _result!.id,
+                    event.feedback!,
+                  );
+            }
 
           case FeedbackEventType.error:
-            setState(() {
-              _streamError = event.error ?? '피드백 생성 실패';
-              _streaming = false;
-            });
+            setState(() => _streaming = false);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('피드백 오류: ${event.error}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _streamError = e.toString();
-          _streaming = false;
-        });
+        setState(() => _streaming = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('스트림 오류: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
 
-  // ── 빌드 ──────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final analyzing = context.watch<RecordProvider>().analyzing;
@@ -162,30 +161,47 @@ class _AnalysisPageState extends State<AnalysisPage> {
             const SizedBox(height: 16),
             _langSelector(),
             const SizedBox(height: 16),
-            _analyzeButton(analyzing),
-
-            // Step 1 완료: 점수 카드
-            if (_record != null) ...[
+            ElevatedButton(
+              onPressed:
+                  (_audioFile != null && _sheetFile != null && !analyzing && !_streaming)
+                      ? _analyze
+                      : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.gold,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: (analyzing || _streaming)
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.black)),
+                        const SizedBox(width: 8),
+                        Text(analyzing ? '분석 중...' : 'GPT 피드백 생성 중...'),
+                      ],
+                    )
+                  : const Text('분석 시작하기',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            if (_result != null) ...[
               const SizedBox(height: 24),
-              _scoreCard(_record!),
+              _resultCard(_result!),
             ],
-
-            // Step 2 진행 중: 스트리밍 텍스트
+            // SSE 스트리밍: 텍스트 누적 표시
             if (_streaming && _streamText.isNotEmpty) ...[
               const SizedBox(height: 16),
               _streamingCard(),
             ],
-
-            // Step 2 완료: 구조화 피드백 카드
-            if (_feedback != null) ...[
+            // 스트리밍 완료: 구조화 피드백 카드
+            if (_streamedFeedback != null) ...[
               const SizedBox(height: 16),
-              FeedbackCard(feedback: _feedback!),
-            ],
-
-            // Step 2 오류
-            if (_streamError != null) ...[
-              const SizedBox(height: 16),
-              _errorCard(_streamError!),
+              FeedbackCard(feedback: _streamedFeedback!),
             ],
           ],
         ),
@@ -193,34 +209,33 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
-  // ── 위젯 빌더 ─────────────────────────────────────────────
-
-  Widget _analyzeButton(bool analyzing) {
-    final busy = analyzing || _streaming;
-    String label = '분석 시작하기';
-    if (analyzing) label = '채점 중...';
-    if (_streaming) label = 'AI 피드백 생성 중...';
-
-    return ElevatedButton(
-      onPressed: (_audioFile != null && _sheetFile != null && !busy) ? _analyze : null,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.gold,
-        foregroundColor: Colors.black,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  /// GPT 토큰이 도착하는 동안 텍스트를 실시간으로 표시하는 카드
+  Widget _streamingCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const SizedBox(
+                    height: 14,
+                    width: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppTheme.gold)),
+                const SizedBox(width: 8),
+                const Text('GPT 피드백 생성 중...',
+                    style: TextStyle(
+                        color: AppTheme.gold, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(_streamText,
+                style: Theme.of(context).textTheme.bodyMedium),
+          ],
+        ),
       ),
-      child: busy
-          ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.black)),
-              const SizedBox(width: 8),
-              Text(label),
-            ])
-          : const Text('분석 시작하기',
-              style: TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 
@@ -246,9 +261,8 @@ class _AnalysisPageState extends State<AnalysisPage> {
               child: Text(
                 file?.name ?? label,
                 style: TextStyle(
-                  color: file != null ? AppTheme.gold : null,
-                  fontWeight: file != null ? FontWeight.bold : FontWeight.normal,
-                ),
+                    color: file != null ? AppTheme.gold : null,
+                    fontWeight: file != null ? FontWeight.bold : FontWeight.normal),
               ),
             ),
             Icon(Icons.upload_file,
@@ -269,7 +283,8 @@ class _AnalysisPageState extends State<AnalysisPage> {
             child: OutlinedButton(
               onPressed: () => setState(() => _lang = l.$1),
               style: OutlinedButton.styleFrom(
-                backgroundColor: selected ? AppTheme.gold.withOpacity(0.15) : null,
+                backgroundColor:
+                    selected ? AppTheme.gold.withOpacity(0.15) : null,
                 side: BorderSide(
                     color: selected ? AppTheme.gold : Colors.grey,
                     width: selected ? 2 : 1),
@@ -287,7 +302,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
     );
   }
 
-  Widget _scoreCard(PracticeRecord r) {
+  Widget _resultCard(PracticeRecord r) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -302,7 +317,8 @@ class _AnalysisPageState extends State<AnalysisPage> {
                         fontWeight: FontWeight.bold,
                         color: AppTheme.gold)),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppTheme.gold,
                     borderRadius: BorderRadius.circular(20),
@@ -339,69 +355,8 @@ class _AnalysisPageState extends State<AnalysisPage> {
                   : 1,
               color: Colors.orangeAccent,
             ),
-            // 피드백 로딩 상태 인디케이터
-            if (_feedback == null && _streamError == null) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  SizedBox(
-                      height: 12,
-                      width: 12,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          color: AppTheme.gold.withOpacity(0.6))),
-                  const SizedBox(width: 8),
-                  Text('AI 피드백 준비 중...',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.gold.withOpacity(0.7))),
-                ],
-              ),
-            ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _streamingCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              const SizedBox(
-                  height: 14,
-                  width: 14,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppTheme.gold)),
-              const SizedBox(width: 8),
-              const Text('AI 피드백 생성 중...',
-                  style: TextStyle(
-                      color: AppTheme.gold, fontWeight: FontWeight.bold)),
-            ]),
-            const SizedBox(height: 12),
-            Text(_streamText, style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _errorCard(String msg) {
-    return Card(
-      color: Colors.red.withOpacity(0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(children: [
-          const Icon(Icons.error_outline, color: Colors.red),
-          const SizedBox(width: 8),
-          Expanded(
-              child: Text(msg,
-                  style: const TextStyle(color: Colors.red, fontSize: 13))),
-        ]),
       ),
     );
   }

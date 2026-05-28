@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"capstone/backend/models"
 	"capstone/backend/services"
@@ -12,14 +11,8 @@ import (
 //
 // Query Parameters:
 //
-//	score          float  채점 점수 (0~100)
-//	correct        int    정확한 음표 수
-//	total          int    전체 음표 수
-//	missed         int    누락 음표 수
-//	timing_errors  int    박자 오류 수
-//	extra          int    여분 음표 수
-//	avg_dev        float  평균 타이밍 편차(초)
-//	lang           string 피드백 언어 (ko|en|ja|zh), 기본값 ko
+//	session_id  string  POST /api/analyze 응답에서 받은 세션 ID (유효시간 5분)
+//	lang        string  피드백 언어 (ko|en|ja|zh), 기본값 ko
 //
 // SSE Response:
 //
@@ -27,9 +20,10 @@ import (
 //	event: done    data: {"type":"done","feedback":{...}}
 //	event: error   data: {"type":"error","error":"..."}
 //
-// 사용 예 (채점 완료 후 별도 SSE 호출):
+// 사용 흐름:
 //
-//	GET /api/feedback/stream?score=83.5&correct=67&total=80&missed=8&timing_errors=5&extra=2&avg_dev=0.087&lang=ko
+//	1. POST /api/analyze → { score, grade, lang, session_id } 수신
+//	2. GET /api/feedback/stream?session_id=<id>&lang=ko → SSE 피드백 수신
 func FeedbackStreamHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeJSON(w, http.StatusMethodNotAllowed, models.ErrorResponse{Error: "GET 메서드만 허용됩니다"})
@@ -37,15 +31,16 @@ func FeedbackStreamHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
+	sessionID := q.Get("session_id")
+	if sessionID == "" {
+		writeJSON(w, http.StatusBadRequest, models.ErrorResponse{Error: "session_id가 필요합니다"})
+		return
+	}
 
-	score := models.ScoreResult{
-		Score:              parseFloat(q.Get("score")),
-		Correct:            parseInt(q.Get("correct")),
-		Total:              parseInt(q.Get("total")),
-		MissedCount:        parseInt(q.Get("missed")),
-		WrongTimingCount:   parseInt(q.Get("timing_errors")),
-		ExtraCount:         parseInt(q.Get("extra")),
-		AvgTimingDeviation: parseFloat(q.Get("avg_dev")),
+	score, ok := services.GetScore(sessionID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, models.ErrorResponse{Error: "세션을 찾을 수 없습니다 (만료되었거나 존재하지 않음)"})
+		return
 	}
 
 	lang := q.Get("lang")
@@ -54,14 +49,4 @@ func FeedbackStreamHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	services.GenerateFeedbackStream(w, &score, lang)
-}
-
-func parseFloat(s string) float64 {
-	v, _ := strconv.ParseFloat(s, 64)
-	return v
-}
-
-func parseInt(s string) int {
-	v, _ := strconv.Atoi(s)
-	return v
 }

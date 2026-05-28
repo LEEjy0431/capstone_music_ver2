@@ -61,10 +61,10 @@ class PracticeRecord {
   final String date;
   final String time;
   final ScoreDetail scoreDetail;
-  // feedback은 SSE 스트리밍 완료 후 채워진다 (초기값 null)
-  final Feedback? feedback;
+  final Feedback? feedback; // SSE 스트리밍 완료 전까지 null
   final String grade;
   final String lang;
+  final String? sessionId; // GET /api/feedback/stream 에 사용 (TTL 5분)
 
   const PracticeRecord({
     required this.id,
@@ -72,9 +72,10 @@ class PracticeRecord {
     required this.date,
     required this.time,
     required this.scoreDetail,
+    this.feedback,
     required this.grade,
     required this.lang,
-    this.feedback,
+    this.sessionId,
   });
 
   double get score => scoreDetail.score;
@@ -85,13 +86,12 @@ class PracticeRecord {
         date: date,
         time: time,
         scoreDetail: scoreDetail,
+        feedback: feedback ?? this.feedback,
         grade: grade,
         lang: lang,
-        feedback: feedback ?? this.feedback,
+        sessionId: sessionId,
       );
 
-  /// /api/analyze 응답 파싱 — score + grade + lang 만 반환됨
-  /// feedback은 null, SSE done 이벤트 수신 후 copyWith으로 채운다
   factory PracticeRecord.fromApiResponse(
     Map<String, dynamic> json, {
     required String title,
@@ -105,13 +105,13 @@ class PracticeRecord {
     return PracticeRecord(
       id: now.millisecondsSinceEpoch,
       title: title,
-      date:
-          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+      date: '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
       time: timeStr,
       scoreDetail: ScoreDetail.fromJson(json['score'] as Map<String, dynamic>),
-      feedback: null,
+      feedback: null, // 피드백은 /api/feedback/stream SSE 수신 후 별도 설정
       grade: json['grade'] as String,
       lang: json['lang'] as String,
+      sessionId: json['session_id'] as String?,
     );
   }
 }

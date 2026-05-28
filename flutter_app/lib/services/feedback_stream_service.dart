@@ -12,9 +12,9 @@ enum FeedbackEventType { chunk, done, error }
 /// 서버에서 수신하는 단일 SSE 이벤트
 class FeedbackEvent {
   final FeedbackEventType type;
-  final String? text;          // chunk: GPT 텍스트 조각
-  final Feedback? feedback;    // done: 완성된 피드백
-  final String? error;         // error: 오류 메시지
+  final String? text;       // chunk: GPT 텍스트 조각
+  final Feedback? feedback; // done: 완성된 피드백
+  final String? error;      // error: 오류 메시지
 
   const FeedbackEvent({
     required this.type,
@@ -46,7 +46,7 @@ class FeedbackEvent {
 /// 사용 예:
 /// ```dart
 /// final buffer = StringBuffer();
-/// await for (final event in FeedbackStreamService.stream(score: s, lang: 'ko')) {
+/// await for (final event in FeedbackStreamService.stream(sessionId: id, lang: 'ko')) {
 ///   if (event.type == FeedbackEventType.chunk) {
 ///     buffer.write(event.text);
 ///     setState(() => _streamText = buffer.toString());
@@ -57,18 +57,12 @@ class FeedbackEvent {
 /// ```
 class FeedbackStreamService {
   static Stream<FeedbackEvent> stream({
-    required ScoreDetail score,
+    required String sessionId,
     required String lang,
   }) async* {
     final uri = Uri.parse('${ApiService.baseUrl}/api/feedback/stream').replace(
       queryParameters: {
-        'score': score.score.toString(),
-        'correct': score.correct.toString(),
-        'total': score.total.toString(),
-        'missed': score.missedCount.toString(),
-        'timing_errors': score.wrongTimingCount.toString(),
-        'extra': score.extraCount.toString(),
-        'avg_dev': score.avgTimingDeviation.toString(),
+        'session_id': sessionId,
         'lang': lang,
       },
     );
@@ -89,18 +83,15 @@ class FeedbackStreamService {
         return;
       }
 
-      // SSE 스트림 파싱
-      // 형식: "event: chunk\ndata: {...}\n\n"
+      // SSE 스트림 파싱: "event: chunk\ndata: {...}\n\n"
       final buffer = StringBuffer();
 
-      await for (final chunk
-          in response.stream.transform(utf8.decoder)) {
+      await for (final chunk in response.stream.transform(utf8.decoder)) {
         buffer.write(chunk);
         final raw = buffer.toString();
 
-        // 완성된 이벤트 블록 (\n\n 로 구분)
+        // 완성된 이벤트 블록 (\n\n 로 구분), 마지막 미완성 블록은 버퍼에 유지
         final blocks = raw.split('\n\n');
-        // 마지막 미완성 블록은 다음 청크를 기다림
         buffer
           ..clear()
           ..write(blocks.last);
@@ -108,7 +99,6 @@ class FeedbackStreamService {
         for (final block in blocks.sublist(0, blocks.length - 1)) {
           if (block.trim().isEmpty || block.startsWith(':')) continue;
 
-          // "event: ...\ndata: ..." 파싱
           String? dataLine;
           for (final line in block.split('\n')) {
             if (line.startsWith('data: ')) {
@@ -119,8 +109,7 @@ class FeedbackStreamService {
           if (dataLine == null || dataLine.isEmpty) continue;
 
           try {
-            final json_ =
-                jsonDecode(dataLine) as Map<String, dynamic>;
+            final json_ = jsonDecode(dataLine) as Map<String, dynamic>;
             final event = FeedbackEvent.fromJson(json_);
             yield event;
 
