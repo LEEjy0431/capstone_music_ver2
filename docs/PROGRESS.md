@@ -157,7 +157,59 @@
 
 ---
 
-## 다음 스프린트 예정 항목
+## [Sprint 6] 2026-05-28 — Mac 환경 호환성 + AI 피드백 SSE 분리
+
+### 완료 항목
+
+**백엔드 — Mac 환경 호환성**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `backend/go.mod` | `github.com/joho/godotenv v1.5.1` 의존성 추가 |
+| `backend/main.go` | `loadEnv()` 함수: `PROJECT_ROOT/.env` → `.env` → `../.env` 순서 자동 탐색 |
+| `backend/services/python_runner.go` | `PYTHON_CMD` 환경변수 지원 (Mac conda 전체 경로 지정 가능) |
+| `backend/services/python_runner.go` | `context.WithTimeout(5분)` Python 서브프로세스 안전 타임아웃 |
+
+**백엔드 — AI 피드백 SSE 스트리밍 분리**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `backend/models/types.go` | `AnalyzeResponse`에서 `Feedback` 필드 제거 (score+grade+lang만 반환) |
+| `backend/handlers/analyze.go` | `GenerateFeedback` 호출 완전 제거 — Python 채점만 수행 |
+| `backend/handlers/feedback_stream.go` | `GET /api/feedback/stream` SSE 엔드포인트 신규 추가 |
+| `backend/services/gpt_stream.go` | OpenAI `stream: true` + `bufio.Scanner` + `http.Flusher` SSE 구현 |
+| `backend/services/i18n_schema.go` | `response_format: json_schema, strict: true` JSON Schema 정의 |
+
+**Flutter — 2단계 분석 흐름**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `flutter_app/lib/models/record.dart` | `feedback Feedback?` nullable + `copyWith()` 메서드 추가 |
+| `flutter_app/lib/providers/record_provider.dart` | `updateFeedback(recordId, feedback)` 메서드 추가 |
+| `flutter_app/lib/services/api_service.dart` | 채점 전용 응답 파싱 (feedback 없음) |
+| `flutter_app/lib/services/feedback_stream_service.dart` | SSE 수신 스트림 서비스 신규 추가 |
+| `flutter_app/lib/pages/analysis_page.dart` | 2단계 UI: Step1 점수 카드 즉시 표시 → Step2 SSE 스트리밍 텍스트 → 완성 피드백 카드 |
+
+**문서**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `.env.example` | `PYTHON_CMD` 환경변수 설명 추가 (Mac conda 경로 가이드) |
+| `backend/README.md` | 2단계 API 흐름 DFD 업데이트, Mac 설정 예시, godotenv/PYTHON_CMD 환경변수 추가 |
+
+### 주요 결정 사항
+- **godotenv 자동 로드**: 팀원이 `export` 없이도 `.env` 파일만 설정하면 서버가 동작하도록 편의성 향상
+- **PYTHON_CMD 환경변수**: conda 환경의 Python 전체 경로를 지정 가능 — Mac Apple Silicon에서 `which python` 결과값 사용
+- **AI 피드백 분리**: `/api/analyze`는 Python 채점만 수행 (~30s), GPT는 `/api/feedback/stream` SSE로 분리
+  - 사용자는 점수 카드를 즉시 보고, GPT 응답을 스트리밍으로 실시간 확인
+  - GPT 오류가 채점 결과를 막지 않음 (독립적 실패)
+- **json_schema strict mode**: OpenAI API `response_format: json_schema + strict: true`로 피드백 JSON 구조 보장
+- **5분 타임아웃**: Python 파이프라인이 무한 대기하는 경우를 방지, `context.DeadlineExceeded` 에러로 명확히 구분
+
+### 발생한 문제 & 해결
+- 없음 (신규 기능 추가, `go build ./...` 빌드 확인 완료)
+
+### 다음 스프린트 예정 항목
 
 > 상세 내용은 `docs/TODO.md` 참조
 

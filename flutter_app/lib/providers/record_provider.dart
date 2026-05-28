@@ -23,6 +23,8 @@ class RecordProvider extends ChangeNotifier {
     return _records.map((r) => r.score).reduce((a, b) => a > b ? a : b);
   }
 
+  /// Step 1: Python 파이프라인 채점만 수행, 점수+등급을 즉시 반환
+  /// feedback은 null 상태 — Step 2(SSE)로 별도 채운다
   Future<PracticeRecord?> analyze({
     required List<int> sheetBytes,
     required String sheetName,
@@ -53,5 +55,13 @@ class RecordProvider extends ChangeNotifier {
       _analyzing = false;
       notifyListeners();
     }
+  }
+
+  /// Step 2: SSE done 이벤트 수신 후 해당 레코드에 피드백을 채운다
+  void updateFeedback(int recordId, Feedback feedback) {
+    final idx = _records.indexWhere((r) => r.id == recordId);
+    if (idx < 0) return;
+    _records[idx] = _records[idx].copyWith(feedback: feedback);
+    notifyListeners();
   }
 }

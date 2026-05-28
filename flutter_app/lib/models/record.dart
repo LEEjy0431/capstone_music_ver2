@@ -61,7 +61,8 @@ class PracticeRecord {
   final String date;
   final String time;
   final ScoreDetail scoreDetail;
-  final Feedback feedback;
+  // feedback은 SSE 스트리밍 완료 후 채워진다 (초기값 null)
+  final Feedback? feedback;
   final String grade;
   final String lang;
 
@@ -71,13 +72,26 @@ class PracticeRecord {
     required this.date,
     required this.time,
     required this.scoreDetail,
-    required this.feedback,
     required this.grade,
     required this.lang,
+    this.feedback,
   });
 
   double get score => scoreDetail.score;
 
+  PracticeRecord copyWith({Feedback? feedback}) => PracticeRecord(
+        id: id,
+        title: title,
+        date: date,
+        time: time,
+        scoreDetail: scoreDetail,
+        grade: grade,
+        lang: lang,
+        feedback: feedback ?? this.feedback,
+      );
+
+  /// /api/analyze 응답 파싱 — score + grade + lang 만 반환됨
+  /// feedback은 null, SSE done 이벤트 수신 후 copyWith으로 채운다
   factory PracticeRecord.fromApiResponse(
     Map<String, dynamic> json, {
     required String title,
@@ -95,7 +109,7 @@ class PracticeRecord {
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
       time: timeStr,
       scoreDetail: ScoreDetail.fromJson(json['score'] as Map<String, dynamic>),
-      feedback: Feedback.fromJson(json['feedback'] as Map<String, dynamic>),
+      feedback: null,
       grade: json['grade'] as String,
       lang: json['lang'] as String,
     );

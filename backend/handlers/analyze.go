@@ -16,8 +16,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// AnalyzeHandler는 POST /api/analyze 요청을 처리한다.
+// AnalyzeHandler — POST /api/analyze
+//
 // multipart/form-data: sheet (xml), audio (wav), lang (ko|en|ja|zh)
+//
+// 채점(Python 파이프라인)만 실행하고 점수+등급을 즉시 반환한다.
+// GPT 피드백은 GET /api/feedback/stream (SSE)으로 별도 수신한다.
+//
+// Response: { score:{...}, grade:"B+", lang:"ko" }
 func AnalyzeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, models.ErrorResponse{Error: "POST 메서드만 허용됩니다"})
@@ -54,17 +60,10 @@ func AnalyzeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	feedback, err := services.GenerateFeedback(score, lang)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, models.ErrorResponse{Error: "피드백 생성 실패: " + err.Error()})
-		return
-	}
-
 	writeJSON(w, http.StatusOK, models.AnalyzeResponse{
-		Score:    *score,
-		Feedback: *feedback,
-		Grade:    calcGrade(score.Score),
-		Lang:     lang,
+		Score: *score,
+		Grade: calcGrade(score.Score),
+		Lang:  lang,
 	})
 }
 
@@ -85,7 +84,6 @@ func calcGrade(score float64) string {
 	}
 }
 
-// saveUploadedFile은 multipart 필드를 임시 파일로 저장하고 경로를 반환한다.
 func saveUploadedFile(r *http.Request, field, pattern string) (string, error) {
 	file, _, err := r.FormFile(field)
 	if err != nil {

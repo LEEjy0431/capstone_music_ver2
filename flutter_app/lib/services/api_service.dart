@@ -8,13 +8,13 @@ class ApiService {
   static const String _defaultBase = 'http://localhost:8080';
 
   static String get baseUrl {
-    // dart-define으로 주입: --dart-define=API_BASE=http://...
     const env = String.fromEnvironment('API_BASE', defaultValue: _defaultBase);
     return env;
   }
 
-  /// POST /api/analyze — multipart upload (sheet + audio + lang)
-  /// [sheetBytes] / [audioBytes]: web에서는 Uint8List, Android에서도 동일
+  /// POST /api/analyze — 채점만 수행 (GPT 없음)
+  /// 반환: PracticeRecord (feedback = null)
+  /// 피드백은 FeedbackStreamService.stream() SSE로 별도 수신
   static Future<PracticeRecord> analyze({
     required List<int> sheetBytes,
     required String sheetName,
@@ -38,12 +38,11 @@ class ApiService {
       filename: audioName,
     ));
 
-    // 웹 환경에서는 CORS preflight가 자동으로 처리됨
     if (!kIsWeb) {
       request.headers['Accept'] = 'application/json';
     }
 
-    final streamed = await request.send().timeout(const Duration(minutes: 3));
+    final streamed = await request.send().timeout(const Duration(minutes: 6));
     final body = await streamed.stream.bytesToString();
 
     if (streamed.statusCode != 200) {
