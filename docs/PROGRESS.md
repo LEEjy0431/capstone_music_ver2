@@ -198,3 +198,51 @@
 - `shared_preferences`로 분석 기록 로컬 저장
 - `godotenv`로 `.env` 자동 로딩
 - Docker Compose (Go + Python 통합 실행)
+
+---
+
+## [Sprint 7] 2026-05-28 — 로컬 저장소 + Docker + pytest
+
+### 완료 항목
+
+**Flutter — 로컬 저장소 (`shared_preferences`)**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `flutter_app/lib/models/record.dart` | `toJson()` 추가 (ScoreDetail, Feedback, PracticeRecord), `fromStoredJson()` 팩토리 추가 |
+| `flutter_app/lib/services/storage_service.dart` | 신규 — SharedPreferences CRUD (`loadRecords` / `saveRecords`) |
+| `flutter_app/lib/providers/record_provider.dart` | `init()` 앱 시작 로드, `analyze` / `updateFeedback` / `deleteRecord` 후 자동 저장 |
+| `flutter_app/lib/main.dart` | `WidgetsFlutterBinding.ensureInitialized()` + `await provider.init()` 추가 |
+| `flutter_app/lib/pages/history_page.dart` | `ExpansionTile` 피드백 인라인 표시 + 삭제 확인 다이얼로그 |
+
+**Docker — Go + Python 통합 실행**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `Dockerfile` | 멀티스테이지: go-builder(1.24-alpine) → runtime(python:3.10-slim) |
+| `docker-compose.yml` | 단일 서비스, env_file `.env`, healthcheck `/health` |
+| `.dockerignore` | node_modules / .env / flutter_app 등 빌드 불필요 파일 제외 |
+
+**Python — pytest 단위 테스트**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `code/tests/__init__.py` | 패키지 선언 |
+| `code/tests/conftest.py` | `sys.path` 자동 설정 |
+| `code/tests/test_module3.py` | `compare_notes` / `group_chords` 22개 테스트 (100% 통과) |
+| `code/pytest.ini` | testpaths / python_files 설정 |
+| `requirements-llm.txt` | `pytest>=8.0.0` 추가 |
+
+### 주요 결정 사항
+- **sessionId 저장 제외**: `shared_preferences`에 저장 시 `sessionId`는 TTL 5분이므로 제외. 재로드 후 피드백 재요청이 필요한 경우 UX에서 안내
+- **단일 컨테이너 Docker**: Go subprocess → Python 방식 유지. 마이크로서비스 분리는 오버엔지니어링
+- **pytest scope**: module3 (순수 로직)만 단위 테스트. module1(music21), module2(piano_transcription)는 무거운 모델 의존성으로 통합 테스트 대상
+
+### 발생한 문제 & 해결
+- 없음 (22개 테스트 전량 통과)
+
+### 다음 스프린트 예정
+- [ ] Flutter Android APK 실기기 테스트
+- [ ] Docker 이미지 빌드 검증 (`docker compose build`)
+- [ ] module1 통합 테스트 (MusicXML 샘플 파일 활용)
+- [ ] 서버 배포 (Render / Railway / fly.io 등 무료 호스팅)

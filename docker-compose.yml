@@ -1,0 +1,20 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env                  # OPENAI_API_KEY 등 민감 정보
+    environment:
+      PROJECT_ROOT: /app
+      PORT: "8080"
+      PYTHON_CMD: python3     # Docker 내부에서는 경로 지정 불필요
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
