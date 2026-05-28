@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/record.dart';
 import '../services/api_service.dart';
+import '../services/storage_service.dart';
 
 class RecordProvider extends ChangeNotifier {
   final List<PracticeRecord> _records = [];
@@ -23,8 +24,18 @@ class RecordProvider extends ChangeNotifier {
     return _records.map((r) => r.score).reduce((a, b) => a > b ? a : b);
   }
 
+  /// 앱 시작 시 로컬 저장 기록을 불러온다.
+  Future<void> init() async {
+    final saved = await StorageService.loadRecords();
+    _records.addAll(saved);
+    notifyListeners();
+  }
+
+  Future<void> _save() async {
+    await StorageService.saveRecords(_records);
+  }
+
   /// POST /api/analyze 호출 — 채점 결과와 session_id를 포함한 레코드를 반환한다.
-  /// GPT 피드백은 포함되지 않으며, updateFeedback() 으로 별도 설정한다.
   Future<PracticeRecord?> analyze({
     required List<int> sheetBytes,
     required String sheetName,
@@ -47,6 +58,7 @@ class RecordProvider extends ChangeNotifier {
         lang: lang,
       );
       _records.insert(0, record);
+      await _save();
       return record;
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -58,10 +70,18 @@ class RecordProvider extends ChangeNotifier {
   }
 
   /// SSE 스트리밍 완료 후 특정 레코드에 피드백을 설정한다.
-  void updateFeedback(int id, Feedback feedback) {
+  Future<void> updateFeedback(int id, Feedback feedback) async {
     final index = _records.indexWhere((r) => r.id == id);
     if (index == -1) return;
     _records[index] = _records[index].copyWith(feedback: feedback);
+    await _save();
+    notifyListeners();
+  }
+
+  /// 특정 기록을 삭제한다.
+  Future<void> deleteRecord(int id) async {
+    _records.removeWhere((r) => r.id == id);
+    await _save();
     notifyListeners();
   }
 }

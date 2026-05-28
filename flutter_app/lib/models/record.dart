@@ -26,6 +26,16 @@ class ScoreDetail {
         extraCount: j['extra_count'] as int,
         avgTimingDeviation: (j['avg_timing_deviation'] as num).toDouble(),
       );
+
+  Map<String, dynamic> toJson() => {
+        'score': score,
+        'correct': correct,
+        'total': total,
+        'missed_count': missedCount,
+        'wrong_timing_count': wrongTimingCount,
+        'extra_count': extraCount,
+        'avg_timing_deviation': avgTimingDeviation,
+      };
 }
 
 class Feedback {
@@ -53,6 +63,15 @@ class Feedback {
         tips: List<String>.from(j['tips'] as List),
         encouragement: j['encouragement'] as String,
       );
+
+  Map<String, dynamic> toJson() => {
+        'overall': overall,
+        'pitch': pitch,
+        'rhythm': rhythm,
+        'timing': timing,
+        'tips': tips,
+        'encouragement': encouragement,
+      };
 }
 
 class PracticeRecord {
@@ -79,6 +98,34 @@ class PracticeRecord {
   });
 
   double get score => scoreDetail.score;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'date': date,
+        'time': time,
+        'score_detail': scoreDetail.toJson(),
+        'feedback': feedback?.toJson(),
+        'grade': grade,
+        'lang': lang,
+        // sessionId는 TTL 5분이므로 저장하지 않음
+      };
+
+  factory PracticeRecord.fromStoredJson(Map<String, dynamic> j) {
+    return PracticeRecord(
+      id: j['id'] as int,
+      title: j['title'] as String,
+      date: j['date'] as String,
+      time: j['time'] as String,
+      scoreDetail: ScoreDetail.fromJson(j['score_detail'] as Map<String, dynamic>),
+      feedback: j['feedback'] != null
+          ? Feedback.fromJson(j['feedback'] as Map<String, dynamic>)
+          : null,
+      grade: j['grade'] as String,
+      lang: j['lang'] as String,
+      sessionId: null,
+    );
+  }
 
   PracticeRecord copyWith({Feedback? feedback}) => PracticeRecord(
         id: id,

@@ -116,7 +116,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
               _streaming = false;
             });
             if (event.feedback != null && _result != null) {
-              context.read<RecordProvider>().updateFeedback(
+              await context.read<RecordProvider>().updateFeedback(
                     _result!.id,
                     event.feedback!,
                   );

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/record.dart';
 import '../providers/record_provider.dart';
 import '../theme.dart';
+import '../widgets/feedback_card.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -56,7 +57,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _tile(BuildContext ctx, PracticeRecord r) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
+      child: ExpansionTile(
         leading: CircleAvatar(
           backgroundColor: AppTheme.gold.withOpacity(0.15),
           child: Text(r.grade,
@@ -67,10 +68,56 @@ class _HistoryPageState extends State<HistoryPage> {
             style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle:
             Text('${r.date} ${r.time}', style: Theme.of(ctx).textTheme.bodySmall),
-        trailing: Text('${r.score.toStringAsFixed(1)}점',
-            style: const TextStyle(
-                color: AppTheme.gold, fontWeight: FontWeight.bold)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${r.score.toStringAsFixed(1)}점',
+                style: const TextStyle(
+                    color: AppTheme.gold, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18),
+              color: Colors.red.withOpacity(0.7),
+              onPressed: () => _confirmDelete(ctx, r),
+              tooltip: '삭제',
+            ),
+          ],
+        ),
+        children: [
+          if (r.feedback != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: FeedbackCard(feedback: r.feedback!),
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('피드백 없음', style: TextStyle(color: Colors.grey)),
+            ),
+        ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext ctx, PracticeRecord r) async {
+    final ok = await showDialog<bool>(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        title: const Text('기록 삭제'),
+        content: Text('"${r.title}" 기록을 삭제할까요?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child:
+                  const Text('삭제', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (ok == true && ctx.mounted) {
+      await ctx.read<RecordProvider>().deleteRecord(r.id);
+    }
   }
 }

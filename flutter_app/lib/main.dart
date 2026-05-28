@@ -9,10 +9,15 @@ import 'pages/history_page.dart';
 import 'pages/stats_page.dart';
 import 'pages/profile_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final provider = RecordProvider();
+  await provider.init();
+
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => RecordProvider(),
+    ChangeNotifierProvider.value(
+      value: provider,
       child: const PianoEvalApp(),
     ),
   );
