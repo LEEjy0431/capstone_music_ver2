@@ -1,0 +1,34 @@
+# ─────────────────────────────────────────────────────────
+# Render 배포 설정
+# 주의: requirements.txt의 torch (~2GB) 때문에 Starter 플랜($7/월) 이상 권장
+#       무료 플랜은 512MB RAM / 제한 디스크로 ML 모델 로드 불가
+# ─────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: capstone-music
+    runtime: python
+    region: singapore
+    plan: starter  # free → starter 업그레이드 필요
+
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt -r requirements-llm.txt
+      curl -fsSL https://go.dev/dl/go1.24.3.linux-amd64.tar.gz | tar -xz -C /tmp
+      export PATH=/tmp/go/bin:$PATH
+      npm ci --silent
+      npm run build
+      cd backend && /tmp/go/bin/go build -o ../server .
+
+    startCommand: ./server
+
+    envVars:
+      - key: PROJECT_ROOT
+        value: /opt/render/project/src
+      - key: PORT
+        value: "8080"
+      - key: PYTHON_CMD
+        value: python3
+      - key: OPENAI_API_KEY
+        sync: false  # Render 대시보드에서 직접 입력
+
+    healthCheckPath: /health

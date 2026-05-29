@@ -297,3 +297,41 @@
 - [ ] iOS Safari / Android Chrome PWA 홈 화면 추가 실기기 테스트
 - [ ] 서버 배포 (Render / Railway / fly.io)
 - [ ] module1 통합 테스트 (MusicXML 샘플 파일 활용)
+
+---
+
+## [Sprint 9] 2026-05-29 — 프론트엔드 데이터 정합성 수정 + 배포 설정
+
+### 완료 항목
+
+**프론트엔드 버그 수정**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `src/HomePage.jsx` | 히트맵 랜덤 데이터 제거 → 실제 `records` 기반 연산. 연속 일수(streak) `records.length` 오용 → `calcStreak()` 함수로 실제 연속 날짜 계산 |
+| `src/StatsPage.jsx` | 존재하지 않는 `r.pitch/rhythm/dynamics/tempo` 필드 제거 → `scoreDetail` 기반 `getMetrics()` 함수로 정확도·완성도·타이밍·정밀도 산출. 레이더 차트·막대 차트 모두 실제 데이터로 교체 |
+| `src/App.jsx` | `profile` 기본값에 `email`, `joinDate` 추가. 기존 localStorage 데이터와 스프레드 병합하여 하위 호환 유지 |
+
+**배포 설정**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `vite.config.js` | `base: process.env.VITE_BASE ?? '/'` 추가 — GitHub Pages 서브경로 지원 |
+| `.github/workflows/deploy-pages.yml` | 신규 — `kts` 푸시 시 PWA 자동 빌드 → GitHub Pages 배포 |
+| `render.yaml` | 신규 — Render 전체 스택(Go + Python) 배포 설정 (Starter 플랜 이상 필요) |
+
+### 주요 결정 사항
+- **2단계 배포 전략**: GitHub Pages (PWA 정적, 즉시 가능) + Render (전체 스택, 유료 필요)
+  - GitHub Pages URL: `https://leejy0431.github.io/capstone_music_ver2/` — 홈/기록/통계/프로필 탭 동작, 분석 탭은 백엔드 별도 설정 필요
+  - Render: torch (~2GB) 때문에 무료 플랜(512MB RAM) 불가 → Starter($7/월) 이상
+- **`getMetrics()` 설계**: `scoreDetail` 없는 구형 record(localStorage)는 `score`로 폴백
+- **히트맵 스케일**: 1회=레벨1, 2회=레벨2, 3회=레벨3, 4회+=레벨4 (이전: 1회도 최대 레벨4였음)
+
+### 발생한 문제 & 해결
+- `StatsPage`에서 `r.pitch/rhythm/dynamics/tempo` 참조 시 `undefined` → `NaN` → `isNaN` 검사 없이 표시되어 차트 전부 0
+  → `scoreDetail` 기반 파생 지표 4종으로 대체
+
+### 다음 스프린트 예정
+- [ ] GitHub Pages에서 PWA 홈 화면 추가 실기기 테스트
+- [ ] Render Starter 플랜 또는 대안 서버에 전체 스택 배포
+- [ ] module1 통합 테스트 (MusicXML 샘플 파일 활용)

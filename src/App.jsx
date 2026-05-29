@@ -67,10 +67,11 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(true);
   const [records, setRecords] = useState(() => loadRecords());
   const [profile, setProfile] = useState(() => {
+    const defaults = { name: "사용자", level: "초급", goal: "정확한 연주", email: "", joinDate: new Date().toISOString().slice(0, 10) };
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
-      return raw ? JSON.parse(raw) : { name: "사용자", level: "초급", goal: "정확한 연주" };
-    } catch { return { name: "사용자", level: "초급", goal: "정확한 연주" }; }
+      return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+    } catch { return defaults; }
   });
   const C = getTheme(darkMode);
 
