@@ -35,8 +35,12 @@ const TABS = [
   {id:"profile",label:"프로필",icon:NAV_ICONS.profile},
 ];
 
-// 개발 시 VITE_API_BASE=http://localhost:8080 설정, 프로덕션(Go 동일 서버)은 빈 문자열
-export const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+export const API_BASE_KEY = "api_base";
+
+// 런타임 서버 URL 조회 — ProfilePage에서 설정한 URL 우선, 없으면 빌드 환경변수 사용
+export function getApiBase() {
+  return localStorage.getItem(API_BASE_KEY) || (import.meta.env.VITE_API_BASE ?? "");
+}
 
 const STORAGE_KEY = "piano_records";
 const PROFILE_KEY = "piano_profile";
@@ -85,7 +89,7 @@ export default function App() {
     formData.append("audio", audioFile);
     formData.append("lang", lang);
 
-    const res = await fetch(`${API_BASE}/api/analyze`, { method: "POST", body: formData });
+    const res = await fetch(`${getApiBase()}/api/analyze`, { method: "POST", body: formData });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "서버 오류");
 

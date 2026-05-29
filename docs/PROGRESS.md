@@ -335,3 +335,38 @@
 - [ ] GitHub Pages에서 PWA 홈 화면 추가 실기기 테스트
 - [ ] Render Starter 플랜 또는 대안 서버에 전체 스택 배포
 - [ ] module1 통합 테스트 (MusicXML 샘플 파일 활용)
+
+---
+
+## [Sprint 10] 2026-05-29 — PWA 독립 배포 + 런타임 서버 URL 설정
+
+### 완료 항목
+
+**Netlify 독립 배포 설정**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `netlify.toml` | 신규 — `npm run build` + `dist/` 게시, SPA 라우팅 폴백 (`/* → /index.html 200`) |
+
+**런타임 서버 URL 설정 (프론트엔드 ↔ 백엔드 분리)**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `src/App.jsx` | `export const API_BASE` → `export function getApiBase()` 로 전환. localStorage `api_base` 키 우선, 없으면 `VITE_API_BASE` 환경변수, 없으면 빈 문자열(동일 서버) |
+| `src/AnalysisPage.jsx` | `API_BASE` import → `getApiBase` 함수 import, SSE/분석 fetch 시 호출 시점에 URL 조회 |
+| `src/ProfilePage.jsx` | "서버 연결" 섹션 추가 — URL 입력, `/health` 연결 테스트, localStorage 저장/삭제 |
+
+### 주요 결정 사항
+- **배포 분리 전략**
+  - PWA 프론트엔드: Netlify (HTTPS 무료, PWA 설치 프롬프트 지원)
+  - Go 백엔드: 로컬 실행 또는 별도 서버 — URL을 앱 내에서 런타임 설정
+- **`getApiBase()` 함수 패턴**: 빌드 타임 고정값이 아닌 호출 시점마다 localStorage 조회 → 사용자가 앱 내에서 서버 변경 즉시 반영 (새로고침 없이)
+- **`AbortSignal.timeout(5000)`**: 연결 테스트 5초 타임아웃, 구형 브라우저도 안전하게 처리
+
+### 발생한 문제 & 해결
+- 없음
+
+### 다음 스프린트 예정
+- [ ] Netlify에 저장소 연결 → PWA 배포 URL 확보
+- [ ] 실기기(iOS Safari / Android Chrome)에서 PWA 홈 화면 추가 테스트
+- [ ] Go 백엔드 서버 배포 (Render Starter 또는 대안)

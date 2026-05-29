@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { API_BASE } from "./App";
+import { getApiBase } from "./App";
 
 const LANG_OPTIONS = [
   { code: "ko", label: "한국어" },
@@ -168,7 +168,7 @@ export default function AnalysisPage({ C, onNavigate, onAnalyze, onFeedback }) {
     if (!record.sessionId) { setStep("done"); return; }
     setStep("streaming");
 
-    const url = `${API_BASE}/api/feedback/stream?session_id=${encodeURIComponent(record.sessionId)}&lang=${lang}`;
+    const url = `${getApiBase()}/api/feedback/stream?session_id=${encodeURIComponent(record.sessionId)}&lang=${lang}`;
     const buffer = { text: "" };
 
     try {
