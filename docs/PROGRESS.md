@@ -246,3 +246,62 @@
 - [ ] Docker 이미지 빌드 검증 (`docker compose build`)
 - [ ] module1 통합 테스트 (MusicXML 샘플 파일 활용)
 - [ ] 서버 배포 (Render / Railway / fly.io 등 무료 호스팅)
+
+---
+
+## [Sprint 8] 2026-05-29 — PWA + Go 단일 서버 배포
+
+### 완료 항목
+
+**PWA (Progressive Web App) 전환**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `vite.config.js` | `vite-plugin-pwa` 추가 — `manifest.webmanifest`, `sw.js` 자동 생성, `autoUpdate` 서비스워커 |
+| `index.html` | PWA 모바일 메타 태그 추가: `viewport-fit=cover`, `apple-mobile-web-app-capable`, `theme-color` 등 |
+| `public/icon.svg` | 피아노 건반 + 금색 음표 SVG 아이콘 (any/maskable 겸용) |
+
+**React 프론트엔드 재구성 (Flutter 대신 PWA로 전환)**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `src/App.jsx` | `API_BASE = import.meta.env.VITE_API_BASE ?? ""` — 프로덕션은 빈 문자열(동일 서버), localStorage 영속화, 2단계 API 분리 (`analyzeStep1` + `applyFeedback`) |
+| `src/AnalysisPage.jsx` | 2단계 SSE UI 완전 재작성 — `idle→analyzing→streaming→done→error` 상태 머신, `fetch()` + `ReadableStream` SSE 파싱 |
+| `src/HistoryPage.jsx` | `RecordItem` 컴포넌트: 인라인 피드백 expand/collapse, 2단계 삭제 확인 |
+
+**Go 백엔드 — PWA 정적 파일 서빙**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `backend/handlers/static.go` | 신규 — `SPAHandler`: `dist/` 정적 서빙 + SPA 폴백(index.html) |
+| `backend/main.go` | `dist/` 존재 시 `mux.Handle("/", SPAHandler(distDir))` 등록, `PROJECT_ROOT` / `os.Executable()` 경로 탐색 |
+
+**Docker 멀티스테이지 — PWA 포함**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `Dockerfile` | Stage 0 추가: `node:22-alpine` pwa-builder, `npm ci && npm run build` → `dist/` 생성 후 runtime 스테이지로 복사 |
+
+**기타**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `.env.example` | `VITE_API_BASE` 주석을 개발 전용으로 명확화 (프로덕션/Docker 불필요 안내 추가) |
+
+### 주요 결정 사항
+- **PWA 선택 (Flutter → PWA 전환)**: 개발 속도 및 업데이트 부담 최소화. 모바일에서 "홈 화면에 추가" 기능으로 앱과 동일한 UX 제공
+- **단일 서버 배포**: Go 서버가 `/api/*` API와 `/` PWA 정적 파일을 모두 서빙. CORS 불필요, 별도 Vite 서버 불필요
+- **`API_BASE = ""`**: 프로덕션에서 Go와 동일 오리진이므로 상대 경로 사용. 개발 시에만 `VITE_API_BASE=http://localhost:8080` 설정
+- **SPA 폴백**: Go `SPAHandler`가 존재하지 않는 경로를 `index.html`로 폴백하여 React Router 경로 지원
+
+### 발생한 문제 & 해결
+- `projectRoot()` 함수가 `services` 패키지 내부 함수라 `main.go`에서 직접 호출 불가
+  → `main.go`에 동일 로직 인라인으로 직접 구현 (`PROJECT_ROOT` env → `os.Executable()` 폴백)
+- `vite-plugin-pwa` 미설치 상태
+  → `npm install vite-plugin-pwa --save-dev`
+
+### 다음 스프린트 예정
+- [ ] Docker 이미지 빌드 검증 (`docker compose build`)
+- [ ] iOS Safari / Android Chrome PWA 홈 화면 추가 실기기 테스트
+- [ ] 서버 배포 (Render / Railway / fly.io)
+- [ ] module1 통합 테스트 (MusicXML 샘플 파일 활용)

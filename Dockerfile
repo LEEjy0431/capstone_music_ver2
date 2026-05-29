@@ -1,4 +1,19 @@
 # ─────────────────────────────────────────────────────────
+# Stage 0: PWA 빌드 (React + Vite)
+# ─────────────────────────────────────────────────────────
+FROM node:22-alpine AS pwa-builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --silent
+
+COPY index.html vite.config.js ./
+COPY public/ ./public/
+COPY src/ ./src/
+
+RUN npm run build
+
+# ─────────────────────────────────────────────────────────
 # Stage 1: Go 바이너리 빌드
 # ─────────────────────────────────────────────────────────
 FROM golang:1.24-alpine AS go-builder
@@ -11,11 +26,7 @@ COPY backend/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
 
 # ─────────────────────────────────────────────────────────
-# Stage 2: Python 런타임 + Go 바이너리
-#
-# TensorFlow/torch 의존성으로 이미지 크기가 크므로
-# 개발 환경에서는 --target go-builder 로 빌드 후
-# 로컬 Python을 사용하는 방식도 가능.
+# Stage 2: Python 런타임 + Go 바이너리 + PWA dist
 # ─────────────────────────────────────────────────────────
 FROM python:3.10-slim AS runtime
 
@@ -27,15 +38,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 의존성 설치 (ML 모델 포함 — 빌드 시 수 분 소요)
+# Python 의존성 설치 (ML 모델 포함 — 최초 빌드 시 수 분 소요)
 COPY requirements.txt requirements-llm.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt -r requirements-llm.txt
 
-# Go 바이너리 복사
+# Go 바이너리 + PWA dist + Python 코드 복사
 COPY --from=go-builder /build/server ./server
-
-# Python 파이프라인 코드 복사
+COPY --from=pwa-builder /app/dist ./dist
 COPY code/ ./code/
 
 # 환경변수 기본값
@@ -44,5 +54,7 @@ ENV PORT=8080
 ENV PYTHON_CMD=python3
 
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+    CMD wget -qO- http://localhost:8080/health || exit 1
 
 CMD ["./server"]

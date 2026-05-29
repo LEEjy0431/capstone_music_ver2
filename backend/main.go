@@ -60,6 +60,21 @@ func main() {
 		fmt.Fprintln(w, `{"status":"ok"}`)
 	})
 
+	// PWA 정적 파일 서빙 (dist/ 폴더가 있을 때만 활성화)
+	root := os.Getenv("PROJECT_ROOT")
+	if root == "" {
+		if exe, err := os.Executable(); err == nil {
+			root = filepath.Dir(filepath.Dir(exe))
+		}
+	}
+	distDir := filepath.Join(root, "dist")
+	if info, err := os.Stat(distDir); err == nil && info.IsDir() {
+		mux.Handle("/", handlers.SPAHandler(distDir))
+		log.Printf("PWA 서빙: %s → http://localhost%s", distDir, ":"+port)
+	} else {
+		log.Println("dist/ 없음 — PWA 서빙 비활성화 (npm run build 후 재시작)")
+	}
+
 	addr := ":" + port
 	log.Printf("서버 시작: http://localhost%s", addr)
 	log.Fatal(http.ListenAndServe(addr, corsHandler(mux)))

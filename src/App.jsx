@@ -35,7 +35,8 @@ const TABS = [
   {id:"profile",label:"프로필",icon:NAV_ICONS.profile},
 ];
 
-export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
+// 개발 시 VITE_API_BASE=http://localhost:8080 설정, 프로덕션(Go 동일 서버)은 빈 문자열
+export const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 const STORAGE_KEY = "piano_records";
 const PROFILE_KEY = "piano_profile";
