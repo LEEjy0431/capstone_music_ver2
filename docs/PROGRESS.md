@@ -201,7 +201,7 @@
 
 ---
 
-## [Sprint 7] 2026-05-28 — 로컬 저장소 + Docker + pytest
+## [Sprint 7] 2026-05-28 — 로컬 저장소 + Docker + pytest *(Docker 이후 계획 제외)*
 
 ### 완료 항목
 
@@ -242,8 +242,6 @@
 - 없음 (22개 테스트 전량 통과)
 
 ### 다음 스프린트 예정
-- [ ] Flutter Android APK 실기기 테스트
-- [ ] Docker 이미지 빌드 검증 (`docker compose build`)
 - [ ] module1 통합 테스트 (MusicXML 샘플 파일 활용)
 - [ ] 서버 배포 (Render / Railway / fly.io 등 무료 호스팅)
 
@@ -276,12 +274,6 @@
 | `backend/handlers/static.go` | 신규 — `SPAHandler`: `dist/` 정적 서빙 + SPA 폴백(index.html) |
 | `backend/main.go` | `dist/` 존재 시 `mux.Handle("/", SPAHandler(distDir))` 등록, `PROJECT_ROOT` / `os.Executable()` 경로 탐색 |
 
-**Docker 멀티스테이지 — PWA 포함**
-
-| 파일 | 변경 내용 |
-|------|-----------|
-| `Dockerfile` | Stage 0 추가: `node:22-alpine` pwa-builder, `npm ci && npm run build` → `dist/` 생성 후 runtime 스테이지로 복사 |
-
 **기타**
 
 | 파일 | 변경 내용 |
@@ -293,6 +285,7 @@
 - **단일 서버 배포**: Go 서버가 `/api/*` API와 `/` PWA 정적 파일을 모두 서빙. CORS 불필요, 별도 Vite 서버 불필요
 - **`API_BASE = ""`**: 프로덕션에서 Go와 동일 오리진이므로 상대 경로 사용. 개발 시에만 `VITE_API_BASE=http://localhost:8080` 설정
 - **SPA 폴백**: Go `SPAHandler`가 존재하지 않는 경로를 `index.html`로 폴백하여 React Router 경로 지원
+- **Docker 배포 제외 결정**: 컨테이너 배포 방식 대신 Go 바이너리 직접 실행 방식으로 배포 진행. `Dockerfile`, `docker-compose.yml`, `.dockerignore` 삭제
 
 ### 발생한 문제 & 해결
 - `projectRoot()` 함수가 `services` 패키지 내부 함수라 `main.go`에서 직접 호출 불가
@@ -301,7 +294,6 @@
   → `npm install vite-plugin-pwa --save-dev`
 
 ### 다음 스프린트 예정
-- [ ] Docker 이미지 빌드 검증 (`docker compose build`)
 - [ ] iOS Safari / Android Chrome PWA 홈 화면 추가 실기기 테스트
 - [ ] 서버 배포 (Render / Railway / fly.io)
 - [ ] module1 통합 테스트 (MusicXML 샘플 파일 활용)
