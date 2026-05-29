@@ -228,7 +228,7 @@ def compare_notes(expected_notes, played_notes,
         'wide_rescued': counts['wide'],
         'octave_rescued': counts['octave'],
         'avg_timing_deviation': avg_dev,
-        'missed_notes': missed[:5],
-        'missed_notes_full': missed,         # ✅ 추가 (module4가 사용)
+        'missed_notes': missed[:],
+        'missed_notes_full': missed,         
         'extra_notes': extras[:5],
     }

@@ -1,10 +1,10 @@
+import os
+import sys
+
 from module1 import extract_notes_from_sheet, get_sheet_bpm, get_last_detected_bpm
 from module2 import extract_notes_from_audio
 from module3 import compare_notes
 from chord_upgrade import verify_missed_notes
-import os
-import sys
-
 
 def check_file_exists(path, label):
     if not os.path.exists(path):
@@ -13,97 +13,147 @@ def check_file_exists(path, label):
         if os.path.isdir(parent):
             print(f"  '{parent}' 안의 파일:")
             for f in sorted(os.listdir(parent)):
-                tag = '[D]' if os.path.isdir(os.path.join(parent, f)) else '[F]'
+                tag = '[폴더]' if os.path.isdir(os.path.join(parent, f)) else '[파일]'
                 print(f"    {tag} {f}")
         return False
     return True
 
 
+def _score_grade(score: float) -> str:
+    """점수 → 등급 문자열."""
+    if score >= 95: return 'S  (완벽)'
+    if score >= 85: return 'A  (우수)'
+    if score >= 70: return 'B  (양호)'
+    if score >= 55: return 'C  (보통)'
+    if score >= 40: return 'D  (미흡)'
+    return          'F  (불합격)'
+
+
+def _bar(value: float, total: float, width: int = 20) -> str:
+    """간단한 텍스트 진행 바."""
+    filled = int(round(value / total * width)) if total else 0
+    return '█' * filled + '░' * (width - filled)
+
+
+def _note_str(n: dict) -> str:
+    """음표 하나를 읽기 쉬운 문자열로."""
+    return f"{n.get('note', '?'):>4}  ({n.get('start', 0):.2f}초)"
+
+
+def _print_note_list(notes: list, label: str, limit: int = 5) -> None:
+    if not notes:
+        return
+    shown = notes[:limit]
+    print(f"\n  [{label}]")
+    for n in shown:
+        print(f"    • {_note_str(n)}")
+    if len(notes) > limit:
+        print(f"    … 외 {len(notes) - limit}개")
+
 if __name__ == '__main__':
 
-    # ── 파일 경로 설정 ──────────────────────────
-    # 직접 수정하거나, 실행 시 인자로 넘길 수 있습니다.
-    # 예: python main.py data/sheet.xml data/record.wav
-    if len(sys.argv) == 3:
+    manual_bpm = None
+    if len(sys.argv) >= 3:
         target_sheet_file = sys.argv[1]
         user_audio_file   = sys.argv[2]
+        if len(sys.argv) >= 4:
+            try:
+                manual_bpm = float(sys.argv[3])
+            except ValueError:
+                print(f'[경고] BPM 인자 "{sys.argv[3]}"이 숫자가 아닙니다. 자동 감지를 사용합니다.')
     else:
-        target_sheet_file = 'data/T+Tik Tak Tok.xml'
-        user_audio_file   = 'data/T+Tik Tak Tok.wav'
+        target_sheet_file = 'data/piano_sheet_3.pdf'
+        user_audio_file   = 'data/piano_record_3.wav'
 
-    print('=== 피아노 연주 자동 평가 시스템 ===\n')
+    print('=' * 50)
+    print('          피아노 연주 자동 평가 시스템')
+    print('=' * 50)
 
-    if not check_file_exists(target_sheet_file, '정답 악보'): exit(1)
-    if not check_file_exists(user_audio_file,   '연주 WAV'):  exit(1)
+    if not check_file_exists(target_sheet_file, '정답 악보'): sys.exit(1)
+    if not check_file_exists(user_audio_file,   '연주 WAV'):  sys.exit(1)
 
-    # ── 1. 정답 악보 분석 ──────────────────────
-    print('1. 정답 악보 분석 중...')
-
+    # ── 1. 악보 분석 ──────────────────────────────────────────
+    print('\n[1단계] 정답 악보 분석 중...')
     sheet_bpm = get_sheet_bpm(target_sheet_file)
     if sheet_bpm:
-        print(f'-> BPM 감지 성공: {sheet_bpm}')
+        print(f'  BPM 감지: {sheet_bpm}')
     else:
-        print('-> BPM 감지 실패 → 악보 분석 후 결정')
+        print('  BPM 감지 실패 → OMR 분석 후 결정')
 
     sheet_music_data = extract_notes_from_sheet(target_sheet_file)
     if not sheet_music_data:
-        print('[오류] 정답 악보 추출 실패'); exit(1)
+        print('\n[오류] 정답 악보 추출 실패')
+        sys.exit(1)
 
-    # 이미지/PDF 입력이면 Claude Vision이 BPM을 감지했을 수 있음
     if sheet_bpm is None:
         sheet_bpm = get_last_detected_bpm()
         if sheet_bpm:
-            print(f'-> Claude Vision BPM 감지: {sheet_bpm}')
+            print(f'  OMR BPM 감지: {sheet_bpm}')
         else:
-            print('-> BPM 감지 실패 → 안전 모드 (quantize 비활성)')
+            print('  BPM 감지 실패 → 안전 모드 (quantize 비활성)')
 
-    print(f'-> 총 {len(sheet_music_data)}개 음표\n')
+    if manual_bpm is not None:
+        print(f'  BPM 수동 지정: {manual_bpm} (감지값 {sheet_bpm} 무시)')
+        sheet_bpm = manual_bpm
 
-    # ── 2. 연주 WAV 분석 ───────────────────────
-    print('2. 연주 WAV 분석 중 (트랜스크립션)...')
+    print(f'  악보 음표 수: {len(sheet_music_data)}개')
+
+    # ── 2. 연주 분석 ──────────────────────────────────────────
+    print('\n[2단계] 연주 오디오 분석 중...')
     user_performance_data = extract_notes_from_audio(user_audio_file, bpm=sheet_bpm)
     if not user_performance_data:
-        print('[오류] 연주 오디오 추출 실패'); exit(1)
-    print(f'-> 총 {len(user_performance_data)}개 음표\n')
+        print('[오류] 연주 오디오 추출 실패')
+        sys.exit(1)
+    print(f'  감지된 음표 수: {len(user_performance_data)}개')
 
-    # ── 3. 1차 채점 ─────────────────────────────
-    print('3. 1차 채점 (5단계 매칭)...')
+    # ── 3. 채점 ───────────────────────────────────────────────
+    print('\n[3단계] 채점 중...')
     result = compare_notes(sheet_music_data, user_performance_data)
-    primary_score = result['score']
-    print(f'-> 1차 점수: {primary_score}점\n')
 
-    # ── 4. Score-aware 검증 ─────────────────────
-    print('4. Score-aware audio 검증...')
+    # ── 4. 검증 ───────────────────────────────────────────────
+    print('\n[4단계] 누락 음표 오디오 검증 중...')
     rescued, truly_missed = verify_missed_notes(
         user_audio_file,
         result['missed_notes_full'],
-        snr_threshold=2.5
+        snr_threshold=2.5,
     )
 
-    result['correct']            += len(rescued)
-    result['missed_count']        = len(truly_missed)
-    result['missed_notes']        = truly_missed[:5]
-    result['score']               = round(result['correct'] / result['total'] * 100, 2)
-    result['score_aware_rescued'] = len(rescued)
+    # ── 최종 수치 계산 ────────────────────────────────────────
+    # 와이드/옥타브 구제 음표도 정답으로 인정 (result['correct']에 이미 포함됨)
+    total        = result['total']
+    correct      = result['correct'] + len(rescued)
+    wrong_timing = result['wide_rescued'] + result['octave_rescued']  # 정답이지만 박자 오차 있음 (참고용)
+    missed_count = len(truly_missed)
+    extra_count  = result['extra_count']
+    final_score  = round(correct / total * 100, 2) if total else 0.0
+    avg_dev      = result['avg_timing_deviation']
 
-    # ── 5. 결과 출력 ────────────────────────────
-    print(f"\n{'='*44}")
-    print(f"             최종 채점 결과")
-    print(f"{'='*44}")
-    print(f"점수:              {result['score']}점 / 100점")
-    print(f"  (1차 {primary_score} → +{round(result['score'] - primary_score, 2)})")
-    print(f"정확한 음표:       {result['correct']} / {result['total']}개")
-    print(f"  ├─ 직접 매칭:    {result['direct_matched']}개")
-    print(f"  ├─ 지속음 매칭:  {result['sustain_matched']}개")
-    print(f"  ├─ 와이드 구제:  {result['wide_rescued']}개")
-    print(f"  ├─ 옥타브 구제:  {result['octave_rescued']}개")
-    print(f"  └─ Audio 검증:   {result['score_aware_rescued']}개")
-    print(f"실제 누락:         {result['missed_count']}개")
-    print(f"여분의 음표:       {result['extra_count']}개")
-    print(f"평균 timing 오차:  {result['avg_timing_deviation']}초")
+    wrong_timing_notes = result.get('wrong_timing_notes', [])
+    extra_notes        = result.get('extra_notes', [])
 
-    if result['missed_notes']:
-        print(f"\n[실제로 안 친 음표]")
-        for n in result['missed_notes']:
-            print(f"  - {n.get('note','?')} (pitch={n['pitch']}) "
-                  f"@ {n['start']}s  [SNR={n.get('verify_snr','?')}]")
+    # ── 결과 출력 ─────────────────────────────────────────────
+    print()
+    print('=' * 50)
+    print('                 최종 채점 결과')
+    print('=' * 50)
+
+    # 점수 & 등급
+    grade = _score_grade(final_score)
+    bar   = _bar(correct, total)
+    print(f'\n  점수:  {final_score:>6.2f}점  /  100점')
+    print(f'  등급:  {grade}')
+    print(f'  [{bar}]  {correct} / {total}개')
+
+    # 항목별 요약
+    print()
+    print(f'     연주한 음표:      {correct:>3}개  / {total}개')
+    print(f'     누락된 음표:      {missed_count:>3}개  (안 친 음표)')
+    print(f'     여분의 음표:      {extra_count:>3}개  (악보에 없는 음표)')
+    if wrong_timing:
+        print(f'  ⚠️   박자 오차 참고:  {wrong_timing:>3}개  (정답 인정, 단 박자가 다소 어긋남)')
+    print(f'\n  평균 타이밍 오차:  {avg_dev:.3f}초')
+
+    # 음표 목록
+    _print_note_list(truly_missed,       '누락된 음표')
+    _print_note_list(wrong_timing_notes, '타이밍 오차 음표')
+    _print_note_list(extra_notes,        '여분의 음표')
