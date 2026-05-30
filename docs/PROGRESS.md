@@ -370,3 +370,58 @@
 - [ ] Netlify에 저장소 연결 → PWA 배포 URL 확보
 - [ ] 실기기(iOS Safari / Android Chrome)에서 PWA 홈 화면 추가 테스트
 - [ ] Go 백엔드 서버 배포 (Render Starter 또는 대안)
+
+---
+
+## [Sprint 11] 2026-05-30 — GPT 피드백 개선 + README 재작성 + 프로젝트 마무리
+
+### 완료 항목
+
+**GPT 피드백 품질 개선**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `backend/services/i18n_schema.go` | `minItems`/`maxItems` 제거 (strict 모드 미지원 — API 오류 원인) |
+| `backend/services/i18n.go` | 프롬프트 강화: `gradeLabel()` 추가, 누락률·여분음 비율 포함한 상세 맥락 제공 |
+| `backend/services/gpt.go` | `MaxTokens` 400→700, `Temperature` 0.3→0.4 |
+| `backend/services/gpt_stream.go` | 동일 조정 |
+
+**프론트엔드 스트리밍 UX 개선**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `src/AnalysisPage.jsx` | `StreamingCard` 재설계: 날 JSON 노출 제거 → 진행률 바 + 섹션 완료 칩 (종합평가/음정/리듬/타이밍/개선팁/마무리) |
+
+**문서 업데이트**
+
+| 파일 | 변경 내용 |
+|------|-----------|
+| `README.md` | Flutter → PWA 전면 재작성: 아키텍처 다이어그램, 프로젝트 구조, 기술 스택, 실행 가이드, macOS 설정, 트러블슈팅 |
+
+### 최종 빌드 상태
+
+| 항목 | 결과 |
+|------|------|
+| Go build (`go build ./...`) | ✅ 통과 |
+| PWA build (`npm run build`) | ✅ 통과 (246KB gzip 70KB) |
+| pytest (`code/tests/`) | ✅ 22/22 통과 |
+
+### 프로젝트 완료 기준 달성 현황
+
+| 기능 | 상태 |
+|------|------|
+| MusicXML 악보 분석 (module1) | ✅ |
+| WAV 연주 음표 추출 (module2, piano_transcription) | ✅ |
+| 채점 알고리즘 (module3) | ✅ |
+| Go HTTP 서버 (`/api/analyze`, `/api/feedback/stream`) | ✅ |
+| GPT-4o-mini SSE 피드백 스트리밍 | ✅ |
+| React PWA (5탭: 홈/분석/기록/통계/프로필) | ✅ |
+| localStorage 기록 영속화 | ✅ |
+| 런타임 서버 URL 설정 (프로필 탭) | ✅ |
+| PWA 홈 화면 추가 지원 (manifest + service worker) | ✅ |
+| pytest 단위 테스트 22개 | ✅ |
+| Netlify 배포 설정 (`netlify.toml`) | ✅ |
+
+### 미완 (배포 관련 — 코드 외 작업)
+- [ ] Netlify 저장소 연결 (대시보드에서 직접 진행)
+- [ ] 백엔드 서버 배포 (Render Starter 또는 개인 서버)
