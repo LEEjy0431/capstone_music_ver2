@@ -1,137 +1,54 @@
 # 피아노 연주 자동 평가 시스템
 
-피아노 악보(MusicXML)와 연주 음원(WAV)을 비교 분석하여 GPT 기반 다국어 피드백을 제공하는 Flutter 모바일 앱입니다.
+피아노 악보(MusicXML)와 연주 음원(WAV)을 비교 분석하여 GPT 기반 다국어 피드백을 제공하는 **PWA(Progressive Web App)** 입니다.  
+모바일 브라우저에서 "홈 화면에 추가"로 앱처럼 설치할 수 있습니다.
 
 ---
 
-## DFD (Data Flow Diagram)
-
-### Level 0 — 컨텍스트 다이어그램
+## 아키텍처 개요
 
 ```
-                        ┌─────────────────────────────┐
-  악보 파일 (XML) ──────►│                             │
-  음원 파일 (WAV) ──────►│   피아노 연주 평가 시스템    │──────► 점수 + GPT 피드백
-  언어 선택 (lang) ─────►│                             │
-                        └─────────────────────────────┘
-```
-
----
-
-### Level 1 — 주요 프로세스 흐름
-
-```
-Flutter 앱
+브라우저 (PWA)
     │
     │  ① POST /api/analyze
     │    multipart: sheet(XML) + audio(WAV) + lang
     ▼
 ┌─────────────────────────────────────────────────────────┐
-│                    Go 백엔드 서버                        │
-│                                                         │
-│  ┌─────────────────┐         ┌──────────────────────┐  │
-│  │  1. 파일 수신    │         │  3. 채점 결과 전달    │  │
-│  │  (analyze.go)   │         │  + session_id 생성   │  │
-│  └────────┬────────┘         │  (store.go)          │  │
-│           │ 임시 파일 저장    └──────────┬───────────┘  │
-│           ▼                             │              │
-│  ┌─────────────────┐                    │              │
-│  │  2. Python 실행  │────────────────────┘              │
-│  │ (python_runner) │  ScoreResult JSON                 │
-│  └─────────────────┘                                   │
+│                    Go 백엔드 서버                         │
+│                                                          │
+│  ┌─────────────────┐         ┌──────────────────────┐   │
+│  │  1. 파일 수신    │         │  3. 채점 결과 전달    │   │
+│  │  (analyze.go)   │         │  + session_id 생성   │   │
+│  └────────┬────────┘         │  (store.go)          │   │
+│           │ 임시 파일 저장    └──────────┬────────────┘  │
+│           ▼                             │               │
+│  ┌─────────────────┐                    │               │
+│  │  2. Python 실행  │────────────────────┘               │
+│  │ (python_runner) │  ScoreResult JSON                  │
+│  └─────────────────┘                                    │
+│                                                          │
+│  정적 파일 서빙: dist/ → SPA 폴백 (static.go)            │
 └─────────────────────────────────────────────────────────┘
-    │ subprocess 실행              │ { score, grade, session_id }
+    │ subprocess                  │ { score, grade, session_id }
     ▼                             ▼
-┌─────────────────────────────┐  Flutter 앱 (점수 즉시 표시)
-│     Python 분석 파이프라인   │       │
-│                             │       │  ② GET /api/feedback/stream
-│  module1.py                 │       │    ?session_id=<id>&lang=ko
-│  ┌─────────────────────┐    │       ▼
-│  │ MusicXML 파싱       │    │  ┌─────────────────────────────────┐
-│  │ → 정답 음표 추출     │    │  │  Go 백엔드 서버                  │
-│  └──────────┬──────────┘    │  │                                 │
-│             │               │  │  4. GetScore(session_id)        │
-│  module2.py ▼               │  │  5. GPT 피드백 생성 (SSE)       │
-│  ┌─────────────────────┐    │  │     (gpt_stream.go + i18n.go)  │
-│  │ WAV → Piano 모델    │    │  │     event: chunk / done / error │
-│  │ → 연주 음표 추출     │    │  └─────────────────────────────────┘
-│  └──────────┬──────────┘    │       │ SSE 스트리밍
-│             │               │       ▼
-│  module3.py ▼               │  Flutter 앱 (피드백 실시간 표시)
-│  ┌─────────────────────┐    │
-│  │ 음표 비교 & 채점     │    │
-│  │ → score / missed /  │    │
-│  │   timing_error 등   │    │
-│  └─────────────────────┘    │
-└─────────────────────────────┘
-```
-
----
-
-### Level 2 — 데이터 상세 흐름
-
-```
-① POST /api/analyze
-───────────────────────────────────────────────────────
-[Flutter: ApiService.analyze()]
-       │
-       │ MultipartRequest { sheet: File, audio: File, lang }
-       ▼
-[Go: handlers/analyze.go]
-       │
-       ├─ saveUploadedFile() → /tmp/xxx.xml, /tmp/xxx.wav
-       ▼
-[Go: services/python_runner.go]
-       │
-       │ exec: python3 code/main.py --sheet <path> --audio <path> --json
-       ▼
-[Python: code/main.py]
-       │
-       ├─ module1: extract_notes_from_musicxml(sheet)
-       │     └─ { note, pitch, start, end, duration, velocity }[]
-       ├─ module2: extract_notes_from_audio(audio)
-       │     └─ { note, pitch, start, end, duration, velocity }[]
-       └─ module3: compare_notes(expected, played)
-             └─ { score, correct, total, missed_count,
-                  wrong_timing_count, extra_count,
-                  avg_timing_deviation, missed_notes[], ... }
-       │ stdout: JSON
-       ▼
-[Go: newSessionID() + StoreScore()]
-       │
-       └─ session_id = crypto/rand 16바이트 hex
-          scoreStore.Store(session_id, ScoreResult, TTL=5분)
-       ▼
-[Go: AnalyzeResponse JSON]
-       └─ { score: {...}, grade, lang, session_id }
-       ▼
-[Flutter: PracticeRecord.fromApiResponse()]
-       └─ 점수 카드 즉시 렌더링
-
-② GET /api/feedback/stream?session_id=<id>&lang=ko
-───────────────────────────────────────────────────────
-[Flutter: FeedbackStreamService.stream()]
-       │
-       │ SSE GET 요청
-       ▼
-[Go: handlers/feedback_stream.go]
-       │
-       ├─ GetScore(session_id) → ScoreResult (만료 시 404)
-       ▼
-[Go: services/gpt_stream.go + i18n.go]
-       │
-       ├─ BuildFeedbackPrompt(score, lang) → system + user prompt
-       ├─ feedbackJSONSchema (strict) → 구조화 출력 강제
-       └─ OpenAI API (gpt-4o-mini, stream: true)
-             ├─ event: chunk  {"type":"chunk","text":"..."}
-             └─ event: done   {"type":"done","feedback":{
-                                  overall, pitch, rhythm, timing,
-                                  tips[], encouragement
-                              }}
-       ▼
-[Flutter: AnalysisPage]
-       ├─ chunk → _streamText 실시간 표시
-       └─ done  → FeedbackCard 렌더링 + provider.updateFeedback()
+┌─────────────────────────┐   PWA (점수 즉시 표시)
+│   Python 분석 파이프라인  │       │
+│                         │       │  ② GET /api/feedback/stream
+│  module1.py             │       │    ?session_id=<id>&lang=ko
+│  ┌───────────────────┐  │       ▼
+│  │ MusicXML → 음표   │  │  ┌──────────────────────────────────┐
+│  └────────┬──────────┘  │  │  Go 백엔드 서버                   │
+│           ▼             │  │                                  │
+│  module2.py             │  │  4. GetScore(session_id)         │
+│  ┌───────────────────┐  │  │  5. GPT 피드백 생성 (SSE)        │
+│  │ WAV → Piano 모델  │  │  │     (gpt_stream.go + i18n.go)   │
+│  └────────┬──────────┘  │  │     event: chunk / done / error  │
+│           ▼             │  └──────────────────────────────────┘
+│  module3.py             │       │ SSE 스트리밍
+│  ┌───────────────────┐  │       ▼
+│  │ 음표 비교 & 채점   │  │   PWA (섹션 진행바 → 피드백 카드)
+│  └───────────────────┘  │
+└─────────────────────────┘
 ```
 
 ---
@@ -140,35 +57,47 @@ Flutter 앱
 
 ```
 capstone_music_ver2/
-├── backend/                        # Go 백엔드 서버
-│   ├── main.go                     # 서버 진입점 (포트 8080)
-│   ├── go.mod                      # Go 모듈 정의
+├── backend/                         # Go 백엔드 서버
+│   ├── main.go                      # 서버 진입점, PWA dist/ 서빙
+│   ├── go.mod
 │   ├── handlers/
-│   │   └── analyze.go              # POST /api/analyze 핸들러
+│   │   ├── analyze.go               # POST /api/analyze
+│   │   ├── feedback_stream.go       # GET /api/feedback/stream (SSE)
+│   │   └── static.go                # SPA 폴백 핸들러
 │   ├── models/
-│   │   └── types.go                # 공유 타입 (ScoreResult, FeedbackResult 등)
+│   │   └── types.go                 # ScoreResult, FeedbackResult 등
 │   └── services/
-│       ├── python_runner.go        # Python subprocess 실행
-│       ├── gpt.go                  # OpenAI GPT API 호출
-│       └── i18n.go                 # 언어별 프롬프트 생성
-├── code/                           # Python 분석 파이프라인
-│   ├── main.py                     # 파이프라인 진입점 (--json 플래그 지원)
-│   ├── module1.py                  # MusicXML → 음표 추출
-│   ├── module2.py                  # WAV → 음표 추출 (Piano Transcription)
-│   └── module3.py                  # 음표 비교 및 채점
-├── src/                            # React 프론트엔드
-│   ├── App.jsx                     # 앱 루트, API 연동
-│   ├── AnalysisPage.jsx            # 파일 업로드 + 피드백 UI
-│   ├── HomePage.jsx                # 대시보드
-│   ├── HistoryPage.jsx             # 연습 기록
-│   ├── StatsPage.jsx               # 통계
-│   └── ProfilePage.jsx             # 프로필
-├── data/                           # 샘플 데이터
-│   ├── piano_sheet_3.xml           # 샘플 악보
-│   └── piano_record_3.wav          # 샘플 녹음
-├── .env.example                    # 환경변수 템플릿
-├── package.json                    # Node 의존성
-└── requirements.txt                # Python 의존성
+│       ├── python_runner.go         # Python subprocess 실행
+│       ├── store.go                 # session_id 메모리 저장 (TTL 5분)
+│       ├── gpt.go                   # OpenAI GPT API (비스트리밍)
+│       ├── gpt_stream.go            # OpenAI GPT API (SSE 스트리밍)
+│       ├── i18n.go                  # 언어별 프롬프트 빌더
+│       └── i18n_schema.go           # GPT JSON 스키마 (strict)
+├── code/                            # Python 분석 파이프라인
+│   ├── main.py                      # 파이프라인 진입점 (--json 모드)
+│   ├── module1.py                   # MusicXML → 음표 추출 (music21)
+│   ├── module2.py                   # WAV → 음표 추출 (piano_transcription)
+│   ├── module3.py                   # 음표 비교 & 채점
+│   └── tests/                       # pytest 단위 테스트 (22개)
+├── src/                             # React PWA 프론트엔드
+│   ├── App.jsx                      # 루트, localStorage, getApiBase()
+│   ├── AnalysisPage.jsx             # 파일 업로드 + SSE 피드백 UI
+│   ├── HomePage.jsx                 # 대시보드, 히트맵, 점수 추이
+│   ├── HistoryPage.jsx              # 연습 기록 목록
+│   ├── StatsPage.jsx                # 레이더 차트, 요일별 통계
+│   └── ProfilePage.jsx              # 프로필, 서버 URL 설정
+├── public/
+│   └── icon.svg                     # PWA 아이콘
+├── dist/                            # 빌드 결과물 (npm run build 생성)
+├── netlify.toml                     # Netlify 배포 설정
+├── render.yaml                      # Render 전체 스택 배포 설정
+├── vite.config.js                   # Vite + VitePWA 설정
+├── index.html                       # PWA 메타 태그 포함
+├── .env.example                     # 환경변수 템플릿
+├── package.json
+├── requirements.txt                 # Python 의존성 (Windows/Linux)
+├── requirements-mac.txt             # macOS 추가 의존성 (tensorflow-macos)
+└── requirements-llm.txt             # OpenAI + pytest
 ```
 
 ---
@@ -177,10 +106,12 @@ capstone_music_ver2/
 
 | 영역 | 기술 |
 |------|------|
-| 프론트엔드 | Flutter 3 (Android + Web), Provider 상태 관리 |
+| 프론트엔드 | React 18, Vite, vite-plugin-pwa (PWA) |
 | 백엔드 | Go 1.24 (net/http) |
-| 음악 분석 | Python, music21, librosa, piano_transcription_inference |
-| AI 피드백 | OpenAI GPT-4o-mini |
+| 음악 분석 | Python 3.10, music21, piano_transcription_inference |
+| AI 피드백 | OpenAI GPT-4o-mini, SSE 스트리밍 |
+| 상태 저장 | localStorage (기록/프로필), sync.Map TTL 5분 (session) |
+| 배포 | Netlify (PWA) + Render (백엔드) 또는 Go 단일 서버 |
 | 지원 언어 | 한국어, English, 日本語, 中文 |
 
 ---
@@ -189,14 +120,14 @@ capstone_music_ver2/
 
 ### 사전 요구사항
 
-- Go 1.21 이상
-- Python 3.10 이상
-- Node.js 18 이상
-- OpenAI API Key
+- **Go** 1.21 이상
+- **Python** 3.10 이상
+- **Node.js** 18 이상
+- **OpenAI API Key** ([platform.openai.com](https://platform.openai.com) 발급)
 
 ---
 
-### 1단계 — 저장소 클론 및 브랜치 전환
+### 1단계 — 저장소 클론
 
 ```bash
 git clone https://github.com/LEEjy0431/capstone_music_ver2.git
@@ -209,30 +140,43 @@ git checkout kts
 ### 2단계 — 환경변수 설정
 
 ```bash
-# .env.example을 복사하여 .env 생성
 cp .env.example .env
 ```
 
-`.env` 파일을 열어 값을 입력하세요:
+`.env` 파일을 열어 아래 두 항목을 입력합니다:
 
-```
-OPENAI_API_KEY=sk-...        # OpenAI API 키
-PORT=8080                    # Go 서버 포트 (기본값 8080)
+```env
+OPENAI_API_KEY=sk-proj-...          # OpenAI API 키 (필수)
+PROJECT_ROOT=/절대경로/capstone_music_ver2   # 프로젝트 루트 경로
+
+# Python 실행 명령어 (기본값: python3)
+# Mac Anaconda 사용 시 전체 경로 입력:
+# PYTHON_CMD=/opt/homebrew/anaconda3/envs/capstone/bin/python
+# Windows:
+# PYTHON_CMD=python
 ```
 
 ---
 
 ### 3단계 — Python 의존성 설치
 
+**Windows / Linux:**
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-llm.txt
 ```
 
-> Windows의 경우 가상환경 사용 권장:
+**macOS (Apple Silicon M1/M2):**
+```bash
+# tensorflow 대신 tensorflow-macos 설치
+pip install -r requirements.txt -r requirements-mac.txt -r requirements-llm.txt
+```
+
+> 가상환경 사용 권장:
 > ```bash
-> python -m venv capstone_env
-> capstone_env\Scripts\activate
-> pip install -r requirements.txt
+> python -m venv venv
+> source venv/bin/activate          # macOS/Linux
+> venv\Scripts\activate             # Windows
+> pip install -r requirements.txt -r requirements-llm.txt
 > ```
 
 ---
@@ -241,17 +185,12 @@ pip install -r requirements.txt
 
 ```bash
 cd backend
-
-# Windows
-set OPENAI_API_KEY=sk-...
-go run main.go
-
-# macOS / Linux
-OPENAI_API_KEY=sk-... go run main.go
+go run .
 ```
 
-서버가 정상 시작되면:
+정상 실행 시:
 ```
+.env 로딩: /path/to/capstone_music_ver2/.env
 서버 시작: http://localhost:8080
 ```
 
@@ -263,57 +202,65 @@ curl http://localhost:8080/health
 
 ---
 
-### 5단계 — Flutter 앱 실행
+### 5단계 — PWA 프론트엔드 실행
 
-새 터미널에서:
-
+**개발 서버 (핫리로드):**
 ```bash
-cd flutter_app
-
-# 의존성 설치
-flutter pub get
-
-# Android (에뮬레이터 또는 실기기)
-flutter run --dart-define=API_BASE=http://<PC_IP>:8080
-
-# Web (Chrome)
-flutter run -d chrome --dart-define=API_BASE=http://localhost:8080
+npm install      # 최초 1회
+npm run dev
+# → http://localhost:5173
 ```
 
-> **Android에서 PC IP 확인**
-> ```bash
-> # macOS
-> ipconfig getifaddr en0
-> # Linux
-> hostname -I
-> ```
+**프로덕션 빌드 (Go 서버가 함께 서빙):**
+```bash
+npm run build
+# dist/ 생성 후 Go 서버(localhost:8080)에서 PWA 자동 서빙
+```
 
 ---
 
-### 6단계 — 사용 방법
+### 6단계 — 서버 URL 연결 (개발 서버 사용 시)
 
-1. 앱 실행 후 **분석** 탭으로 이동
-2. **연주 음원 파일 (WAV)** 업로드
-3. **악보 파일 (MusicXML)** 업로드
-4. **피드백 언어** 선택 (한국어 / English / 日本語 / 中文)
-5. **분석 시작하기** 버튼 클릭
-6. 결과 확인:
-   - 점수 및 등급 (A ~ C) — **즉시 표시**
-   - 정확한 음표 / 놓친 음표 / 박자 오류 수
-   - GPT 생성 피드백 실시간 스트리밍 (종합 평가 / 음정 / 리듬 / 타이밍 / 개선 팁 / 격려)
+1. 브라우저에서 `http://localhost:5173` 접속
+2. **프로필 탭** → 서버 연결 → `http://localhost:8080` 입력
+3. **연결 테스트** → "✓ 서버 연결 성공" 확인 → **저장**
+
+> 프로덕션 빌드(`npm run build`) 후 Go 서버(8080)로 접속하면 서버 URL 설정 불필요
 
 ---
 
-### Python 파이프라인 단독 실행 (테스트용)
+### 7단계 — 사용 방법
+
+1. **분석 탭** → WAV 파일 + MusicXML 파일 업로드
+2. 피드백 언어 선택 (한국어 / English / 日本語 / 中文)
+3. **분석 시작하기** 클릭
+4. 결과 확인:
+   - 점수 및 등급 (A+~C) — **즉시 표시**
+   - 정확도 / 누락 음표 / 박자 오류 바 차트
+   - GPT 피드백 진행 바 → 피드백 카드 (종합 평가 / 음정 / 리듬 / 타이밍 / 개선 팁)
+
+---
+
+### PWA 설치 (모바일 홈 화면)
+
+| OS | 방법 |
+|----|------|
+| iOS Safari | 공유 버튼 → "홈 화면에 추가" |
+| Android Chrome | 주소창 설치 아이콘 또는 메뉴 → "앱 설치" |
+
+---
+
+### Python 파이프라인 단독 테스트
 
 ```bash
-cd capstone_music_ver2
-
-# 기존 콘솔 출력 모드
+# 콘솔 출력 모드
 python code/main.py --sheet data/piano_sheet_3.xml --audio data/piano_record_3.wav
 
-# JSON 모드 (Go 연동과 동일한 출력)
+# JSON 모드 (Go 연동과 동일)
 python code/main.py --sheet data/piano_sheet_3.xml --audio data/piano_record_3.wav --json
+
+# 단위 테스트
+cd code && pytest tests/ -v
 ```
 
 ---
@@ -328,7 +275,7 @@ python code/main.py --sheet data/piano_sheet_3.xml --audio data/piano_record_3.w
 |------|------|------|
 | `sheet` | File | 악보 파일 (MusicXML, .xml) |
 | `audio` | File | 연주 음원 파일 (.wav) |
-| `lang` | string | 피드백 언어 코드 (`ko` / `en` / `ja` / `zh`), 기본값 `ko` |
+| `lang` | string | 피드백 언어 (`ko` / `en` / `ja` / `zh`), 기본값 `ko` |
 
 **Response** — `application/json`
 
@@ -341,10 +288,7 @@ python code/main.py --sheet data/piano_sheet_3.xml --audio data/piano_record_3.w
     "missed_count": 8,
     "wrong_timing_count": 5,
     "extra_count": 2,
-    "avg_timing_deviation": 0.087,
-    "missed_notes": [...],
-    "wrong_timing_notes": [...],
-    "extra_notes": [...]
+    "avg_timing_deviation": 0.087
   },
   "grade": "B+",
   "lang": "ko",
@@ -352,12 +296,13 @@ python code/main.py --sheet data/piano_sheet_3.xml --audio data/piano_record_3.w
 }
 ```
 
-> GPT 피드백은 응답에 포함되지 않습니다. `session_id`를 사용해 `GET /api/feedback/stream` 으로 별도 수신합니다.
+> GPT 피드백은 포함되지 않습니다. `session_id`로 `/api/feedback/stream` 에서 별도 수신합니다.
 
 **등급 기준**
 
 | 점수 | 등급 |
 |------|------|
+| 95점 이상 | A+ |
 | 90점 이상 | A |
 | 85점 이상 | A- |
 | 80점 이상 | B+ |
@@ -373,8 +318,8 @@ python code/main.py --sheet data/piano_sheet_3.xml --audio data/piano_record_3.w
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
-| `session_id` | string | `POST /api/analyze` 응답의 `session_id` (유효시간 5분) |
-| `lang` | string | 피드백 언어 (`ko`/`en`/`ja`/`zh`), 기본값 `ko` |
+| `session_id` | string | `/api/analyze` 응답의 `session_id` (유효시간 5분) |
+| `lang` | string | 피드백 언어, 기본값 `ko` |
 
 **Response** — `text/event-stream` (SSE)
 
@@ -383,12 +328,15 @@ event: chunk
 data: {"type":"chunk","text":"전반적으로 안정적인 연주입니다"}
 
 event: done
-data: {"type":"done","feedback":{"overall":"...","pitch":"...","rhythm":"...","timing":"...","tips":["..."],"encouragement":"..."}}
+data: {"type":"done","feedback":{"overall":"...","pitch":"...","rhythm":"...","timing":"...","tips":["...","..."],"encouragement":"..."}}
+
+event: error
+data: {"type":"error","error":"세션을 찾을 수 없습니다"}
 ```
 
-### `GET /health`
+---
 
-서버 상태 확인
+### `GET /health`
 
 ```json
 {"status": "ok"}
@@ -398,36 +346,43 @@ data: {"type":"done","feedback":{"overall":"...","pitch":"...","rhythm":"...","t
 
 ## 트러블슈팅
 
-**Go 서버 실행 시 `OPENAI_API_KEY 환경변수가 설정되지 않았습니다` 오류**
-→ `.env` 파일의 키를 환경변수로 직접 export하거나 서버 실행 시 앞에 붙여서 실행하세요.
-
-**Python 실행 실패 오류**
-→ `pip install -r requirements.txt`가 완료되었는지 확인하고, 가상환경이 활성화된 상태에서 Go 서버를 실행하세요.
-
-**CORS 오류 (브라우저)**
-→ Go 서버가 `http://localhost:8080`에서 실행 중인지 확인하고, `.env`의 `VITE_API_BASE` 값과 일치하는지 확인하세요.
-
-**WAV 파일 업로드 후 분석 실패**
-→ 파일이 표준 WAV 포맷(PCM, 모노 또는 스테레오)인지 확인하세요. MP3는 WAV로 변환 후 사용하세요.
-
-**Go 서버 실행 시 `code/main.py` 경로 오류**
-→ `PROJECT_ROOT` 환경변수를 프로젝트 루트로 설정하세요.
-```bash
-# Windows
-set PROJECT_ROOT=D:\Projects\capstone_music_ver2
-
-# macOS / Linux
-export PROJECT_ROOT=/path/to/capstone_music_ver2
+**`.env` 로딩 메시지가 안 보임**
+→ 서버가 `backend/` 디렉토리에서 실행될 때 `../env`를 자동 탐색합니다. `PROJECT_ROOT` 를 명시하면 확실합니다:
+```env
+PROJECT_ROOT=D:\Projects\capstone_music_ver2   # Windows
+PROJECT_ROOT=/Users/yourname/capstone_music_ver2  # macOS
 ```
+
+**`OPENAI_API_KEY 미설정` 오류**
+→ `.env` 파일에 키가 있는지, Go 서버가 프로젝트 루트에서 실행되는지 확인하세요.
+
+**Python 실행 실패**
+→ 가상환경이 활성화된 상태에서 Go 서버를 실행하거나 `.env`에 `PYTHON_CMD` 전체 경로를 설정하세요:
+```env
+PYTHON_CMD=/opt/homebrew/anaconda3/envs/capstone/bin/python
+```
+
+**macOS에서 `tensorflow` 설치 실패**
+→ `requirements-mac.txt`를 함께 설치하세요:
+```bash
+pip install -r requirements.txt -r requirements-mac.txt -r requirements-llm.txt
+```
+
+**WAV 분석 실패**
+→ 표준 PCM WAV 포맷인지 확인하세요. MP3는 변환 후 사용:
+```bash
+ffmpeg -i input.mp3 output.wav
+```
+
+**CORS 오류 (개발 서버)**
+→ 프로필 탭 → 서버 연결에서 Go 서버 URL(`http://localhost:8080`)을 저장했는지 확인하세요.
 
 ---
 
 ## 폴더별 상세 문서
 
-각 폴더에 DFD 및 상세 사용 가이드가 포함된 README가 있습니다.
-
 | 폴더 | 설명 | 문서 |
 |------|------|------|
 | `backend/` | Go HTTP 서버 | [backend/README.md](./backend/README.md) |
 | `code/` | Python 분석 파이프라인 | [code/README.md](./code/README.md) |
-| `src/` | React 프론트엔드 | [src/README.md](./src/README.md) |
+| `src/` | React PWA 프론트엔드 | [src/README.md](./src/README.md) |
