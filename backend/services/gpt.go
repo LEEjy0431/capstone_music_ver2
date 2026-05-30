@@ -57,8 +57,8 @@ func GenerateFeedback(score *models.ScoreResult, lang string) (*models.FeedbackR
 			{Role: "user", Content: userPrompt},
 		},
 		ResponseFormat: feedbackJSONSchema,
-		Temperature:    0.3,
-		MaxTokens:      400,
+		Temperature:    0.4,
+		MaxTokens:      700,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("요청 직렬화 실패: %w", err)

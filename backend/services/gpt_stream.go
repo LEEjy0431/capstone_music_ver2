@@ -69,8 +69,8 @@ func GenerateFeedbackStream(w http.ResponseWriter, score *models.ScoreResult, la
 			{Role: "user", Content: userPrompt},
 		},
 		ResponseFormat: feedbackJSONSchema,
-		Temperature:    0.3,
-		MaxTokens:      400,
+		Temperature:    0.4,
+		MaxTokens:      700,
 		Stream:         true,
 	})
 	if err != nil {

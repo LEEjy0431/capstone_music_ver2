@@ -104,14 +104,48 @@ function FeedbackCard({ C, feedback }) {
 }
 
 // ── 스트리밍 중 표시 카드 ────────────────────────────────────────────────
+const FEEDBACK_SECTIONS = ["종합 평가", "음정", "리듬", "타이밍", "개선 팁", "마무리"];
+
 function StreamingCard({ C, text }) {
+  // JSON 길이 기준 진행률 추정 (평균 완성 JSON ~600자)
+  const pct = Math.min(97, Math.round((text.length / 600) * 100));
+  // 섹션별 활성화 임계값 (균등 분배)
+  const sectionThreshold = 100 / FEEDBACK_SECTIONS.length;
+
   return (
     <div style={{ background: C.cardBg, borderRadius: 14, padding: 18 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <Spinner color={C.gold} size={14} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: C.gold }}>AI 피드백 생성 중...</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Spinner color={C.gold} size={14} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.gold }}>AI 피드백 생성 중</span>
+        </div>
+        <span style={{ fontSize: 12, color: C.textMuted }}>{pct}%</span>
       </div>
-      <div style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{text}</div>
+
+      {/* 진행 바 */}
+      <div style={{ height: 5, background: "#2a2a2a", borderRadius: 3, overflow: "hidden", marginBottom: 16 }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg,${C.goldDark},${C.gold})`, borderRadius: 3, transition: "width 0.4s ease" }} />
+      </div>
+
+      {/* 섹션 완료 표시 */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {FEEDBACK_SECTIONS.map((label, i) => {
+          const done = pct >= (i + 1) * sectionThreshold;
+          return (
+            <div key={label} style={{
+              fontSize: 11, padding: "4px 10px", borderRadius: 20,
+              background: done ? "rgba(240,180,41,0.15)" : "#2a2a2a",
+              color: done ? C.gold : C.textMuted,
+              fontWeight: done ? 700 : 400,
+              transition: "all 0.3s",
+              display: "flex", alignItems: "center", gap: 4,
+            }}>
+              {done && <span style={{ fontSize: 9 }}>✓</span>}
+              {label}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

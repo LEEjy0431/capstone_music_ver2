@@ -22,23 +22,69 @@ func NormalizeLang(lang string) string {
 	return "ko"
 }
 
+// gradeLabel은 점수를 등급 문자열로 변환한다.
+func gradeLabel(score float64) string {
+	switch {
+	case score >= 95:
+		return "A+ (excellent)"
+	case score >= 90:
+		return "A (great)"
+	case score >= 85:
+		return "A- (good)"
+	case score >= 80:
+		return "B+ (above average)"
+	case score >= 75:
+		return "B (average)"
+	case score >= 70:
+		return "C+ (needs work)"
+	default:
+		return "C (needs significant improvement)"
+	}
+}
+
 // BuildFeedbackPrompt는 채점 결과와 언어 코드를 받아 GPT system/user 프롬프트를 생성한다.
-// 토큰 수 최적화: system ~90 토큰, user ~60 토큰 (기존 대비 ~40% 절감)
 func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user string) {
 	lang = NormalizeLang(lang)
 	langName := SupportedLangs[lang]
 
 	system = fmt.Sprintf(
-		"You are a piano teacher. Respond ONLY in %s (%s). Output valid JSON only.",
+		"You are an experienced piano teacher providing detailed, constructive performance feedback. "+
+			"Always respond ONLY in %s (%s). Output valid JSON only — no markdown, no extra text.",
 		langName, lang,
 	)
 
+	// 누락률 / 여분음 비율 계산
+	missedPct := 0.0
+	extraPct := 0.0
+	if score.Total > 0 {
+		missedPct = float64(score.MissedCount) / float64(score.Total) * 100
+		extraPct = float64(score.ExtraCount) / float64(score.Total) * 100
+	}
+
 	user = fmt.Sprintf(
-		"Score:%.1f/100 Correct:%d/%d Missed:%d TimingErr:%d Extra:%d AvgDev:%.3fs. Give feedback JSON.",
-		score.Score, score.Correct, score.Total,
-		score.MissedCount, score.WrongTimingCount,
-		score.ExtraCount, score.AvgTimingDeviation,
+		"Piano performance analysis result:\n"+
+			"- Overall score: %.1f/100 (Grade: %s)\n"+
+			"- Notes played correctly: %d out of %d total (%.1f%%)\n"+
+			"- Missed notes: %d (%.1f%% of total)\n"+
+			"- Timing errors: %d notes with wrong onset time\n"+
+			"- Extra notes (not in score): %d (%.1f%%)\n"+
+			"- Average timing deviation: %.3f seconds\n\n"+
+			"Based on these metrics, provide specific and helpful feedback. "+
+			"Include 2-3 practical improvement tips in the 'tips' array.",
+		score.Score, gradeLabel(score.Score),
+		score.Correct, score.Total, float64(score.Correct)/float64(max(score.Total, 1))*100,
+		score.MissedCount, missedPct,
+		score.WrongTimingCount,
+		score.ExtraCount, extraPct,
+		score.AvgTimingDeviation,
 	)
 
 	return
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
