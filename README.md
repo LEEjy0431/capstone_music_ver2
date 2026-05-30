@@ -160,15 +160,15 @@ PROJECT_ROOT=/절대경로/capstone_music_ver2   # 프로젝트 루트 경로
 
 ### 3단계 — Python 의존성 설치
 
+**macOS (Apple Silicon M1/M2/M3):**
+```bash
+pip install -r requirements.txt -r requirements-mac.txt -r requirements-llm.txt
+```
+
 **Windows / Linux:**
 ```bash
 pip install -r requirements.txt -r requirements-llm.txt
-```
-
-**macOS (Apple Silicon M1/M2):**
-```bash
-# tensorflow 대신 tensorflow-macos 설치
-pip install -r requirements.txt -r requirements-mac.txt -r requirements-llm.txt
+pip install tensorflow==2.16.2   # tensorflow는 플랫폼별 별도 설치
 ```
 
 > 가상환경 사용 권장:
@@ -176,7 +176,7 @@ pip install -r requirements.txt -r requirements-mac.txt -r requirements-llm.txt
 > python -m venv venv
 > source venv/bin/activate          # macOS/Linux
 > venv\Scripts\activate             # Windows
-> pip install -r requirements.txt -r requirements-llm.txt
+> # 이후 위 pip install 명령어 실행
 > ```
 
 ---
