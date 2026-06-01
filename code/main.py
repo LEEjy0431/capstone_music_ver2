@@ -10,7 +10,7 @@ Go 백엔드 연동 (JSON 모드):
 
 환경 변수 (.env 또는 export):
     ANTHROPIC_API_KEY=sk-ant-...   Claude Vision fallback 사용 시 필수
-    OEMER_TIMEOUT=900              oemer 최대 대기 시간(초)
+    AUDIVERIS_TIMEOUT=300          Audiveris 최대 대기 시간(초)
 """
 
 # ── .env 자동 로드 ─────────────────────────────────────────────
@@ -30,7 +30,7 @@ from module2 import extract_notes_from_audio
 from module3 import compare_notes
 from chord_upgrade import verify_missed_notes
 
-OEMER_TIMEOUT = int(os.environ.get('OEMER_TIMEOUT', '900'))
+AUDIVERIS_TIMEOUT = int(os.environ.get('AUDIVERIS_TIMEOUT', '300'))
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data')
 
@@ -95,7 +95,7 @@ def run_pipeline(sheet_path: str, audio_path: str, manual_bpm: float | None = No
     if sheet_bpm:
         print(f'  BPM 감지: {sheet_bpm}', file=sys.stderr)
 
-    sheet_data = extract_notes_from_sheet(sheet_path, oemer_timeout=OEMER_TIMEOUT)
+    sheet_data = extract_notes_from_sheet(sheet_path, audiveris_timeout=AUDIVERIS_TIMEOUT)
     if not sheet_data:
         return {'error': '악보 추출 실패 (oemer/Claude Vision 모두 실패 또는 지원하지 않는 형식)'}
 
@@ -227,11 +227,18 @@ def main():
 
     # ── JSON 모드 (Go subprocess 연동) ────────────────────────
     if args.json_mode:
+        # module1/2/3의 print() 로그가 stdout을 오염시키지 않도록
+        # 파이프라인 실행 중 stdout → stderr로 리다이렉트
+        _real_stdout = sys.stdout
+        sys.stdout = sys.stderr
         try:
             result = run_pipeline(args.sheet, args.audio, manual_bpm=args.bpm)
-            print(json.dumps(result, ensure_ascii=False))
         except Exception as e:
-            print(json.dumps({'error': str(e)}, ensure_ascii=False))
+            result = {'error': str(e)}
+        finally:
+            sys.stdout = _real_stdout
+        print(json.dumps(result, ensure_ascii=False))
+        if 'error' in result:
             sys.exit(1)
         return
 
