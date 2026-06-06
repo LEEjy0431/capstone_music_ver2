@@ -210,9 +210,9 @@ def print_console_result(result: dict) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description='피아노 연주 자동 평가 시스템')
-    parser.add_argument('--sheet', default=os.path.join(_DATA_DIR, 'piano_sheet_3.xml'),
-                        help='악보 파일 경로 (xml/mxl/mid/png/jpg/pdf)')
-    parser.add_argument('--audio', default=os.path.join(_DATA_DIR, 'piano_record_3.wav'),
+    parser.add_argument('--sheet', required=True,
+                        help='악보 파일 경로 (xml/mxl/mid/png/jpg/jpeg/pdf)')
+    parser.add_argument('--audio', required=True,
                         help='연주 WAV 파일 경로')
     parser.add_argument('--bpm',  type=float, default=None,
                         help='BPM 수동 지정 (미입력 시 자동 감지)')

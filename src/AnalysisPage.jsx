@@ -268,8 +268,8 @@ export default function AnalysisPage({ C, onNavigate, onAnalyze, onFeedback }) {
       {/* 파일 선택 (결과 없을 때만) */}
       {step === "idle" && (
         <>
-          <FileDropZone C={C} label="연주 음원 (WAV)" accept=".wav,audio/*" hint="WAV 파일을 드래그하거나 클릭" file={audioFile} onFile={setAudioFile} />
-          <FileDropZone C={C} label="악보 파일 (MusicXML)" accept=".xml,.mxl" hint="MusicXML 파일을 드래그하거나 클릭" file={sheetFile} onFile={setSheetFile} />
+          <FileDropZone C={C} label="연주 음원 (WAV)" accept=".wav" hint="WAV 파일을 드래그하거나 클릭" file={audioFile} onFile={setAudioFile} />
+          <FileDropZone C={C} label="악보 파일 (XML · PDF · PNG · JPG)" accept=".xml,.musicxml,.mxl,.mid,.midi,.pdf,.png,.jpg,.jpeg" hint="MusicXML / PDF / 이미지 파일을 드래그하거나 클릭" file={sheetFile} onFile={setSheetFile} />
 
           {/* 언어 선택 */}
           <div style={{ background: C.surface, borderRadius: 14, padding: "14px 16px" }}>
