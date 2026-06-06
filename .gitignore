@@ -108,6 +108,10 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+capstone_env
+
+# Claude Code internal files
+.claude/
 
 .spyderproject
 .spyproject
@@ -132,6 +136,7 @@ __marimo__/
 
 # Piano transcription model data
 piano_transcription_inference_data/
+piano_transcription_inference_data.zip
 *.pth
 
 # ── Flutter ───────────────────────────────────────────────────

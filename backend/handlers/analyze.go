@@ -4,9 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"capstone/backend/models"
 	"capstone/backend/services"
@@ -37,7 +40,8 @@ func AnalyzeHandler(w http.ResponseWriter, r *http.Request) {
 		lang = "ko"
 	}
 
-	sheetPath, err := saveUploadedFile(r, "sheet", "*.xml")
+	// 악보: xml / mxl / mid / png / jpg / jpeg / pdf 허용
+	sheetPath, err := saveUploadedFileWithExt(r, "sheet")
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, models.ErrorResponse{Error: "악보 파일 오류: " + err.Error()})
 		return
@@ -106,6 +110,43 @@ func saveUploadedFile(r *http.Request, field, pattern string) (string, error) {
 	defer file.Close()
 
 	tmp, err := os.CreateTemp("", pattern)
+	if err != nil {
+		return "", err
+	}
+	defer tmp.Close()
+
+	if _, err := io.Copy(tmp, file); err != nil {
+		os.Remove(tmp.Name())
+		return "", err
+	}
+
+	return tmp.Name(), nil
+}
+
+// saveUploadedFileWithExt는 원본 파일 확장자를 유지해 임시 파일로 저장한다.
+// Python module1이 확장자로 파일 형식을 판별하므로 확장자 보존이 필수다.
+func saveUploadedFileWithExt(r *http.Request, field string) (string, error) {
+	file, header, err := r.FormFile(field)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	// 허용 확장자 검사
+	origName := header.Filename
+	ext := strings.ToLower(filepath.Ext(origName))
+	allowed := map[string]bool{
+		".xml": true, ".musicxml": true, ".mxl": true,
+		".mid": true, ".midi": true,
+		".png": true, ".jpg": true, ".jpeg": true,
+		".bmp": true, ".tiff": true, ".tif": true,
+		".pdf": true,
+	}
+	if !allowed[ext] {
+		return "", fmt.Errorf("지원하지 않는 악보 형식: %s (허용: xml/mxl/mid/png/jpg/jpeg/bmp/tiff/pdf)", ext)
+	}
+
+	tmp, err := os.CreateTemp("", "sheet_*"+ext)
 	if err != nil {
 		return "", err
 	}
