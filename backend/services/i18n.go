@@ -49,7 +49,9 @@ func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user st
 
 	system = fmt.Sprintf(
 		"You are an experienced piano teacher providing detailed, constructive performance feedback. "+
-			"Always respond ONLY in %s (%s). Output valid JSON only — no markdown, no extra text.",
+			"Always respond ONLY in %s (%s).\n"+
+			"You MUST respond with ONLY a valid JSON object. No explanation, no markdown, no extra text before or after the JSON.\n"+
+			"The JSON must have exactly these keys: overall, pitch, rhythm, timing, tips (array of 2-3 strings), encouragement.",
 		langName, lang,
 	)
 

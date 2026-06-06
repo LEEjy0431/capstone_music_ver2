@@ -43,9 +43,9 @@ var streamClient = &http.Client{Timeout: 0}
 //
 // 호출 예: GET /api/feedback/stream
 func GenerateFeedbackStream(w http.ResponseWriter, score *models.ScoreResult, lang string) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		writeSSEEvent(w, StreamEvent{Type: "error", Error: "OPENAI_API_KEY 미설정"})
+	apiKey, err := llmAPIKey()
+	if err != nil {
+		writeSSEEvent(w, StreamEvent{Type: "error", Error: err.Error()})
 		return
 	}
 
@@ -62,23 +62,28 @@ func GenerateFeedbackStream(w http.ResponseWriter, score *models.ScoreResult, la
 
 	systemPrompt, userPrompt := BuildFeedbackPrompt(*score, lang)
 
-	reqBody, err := json.Marshal(gptRequest{
-		Model: "gpt-4o-mini",
+	streamReq := gptRequest{
+		Model: llmModel(),
 		Messages: []gptMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
-		ResponseFormat: feedbackJSONSchema,
-		Temperature:    0.4,
-		MaxTokens:      700,
-		Stream:         true,
-	})
+		Temperature: 0.4,
+		MaxTokens:   1024,
+		Stream:      true,
+	}
+	if !isOllama() {
+		streamReq.ResponseFormat = feedbackJSONSchema
+		streamReq.MaxTokens = 700
+	}
+
+	reqBody, err := json.Marshal(streamReq)
 	if err != nil {
 		writeSSEEvent(w, StreamEvent{Type: "error", Error: "요청 직렬화 실패: " + err.Error()})
 		return
 	}
 
-	req, err := http.NewRequest("POST", openAIURL, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequest("POST", llmURL(), bytes.NewBuffer(reqBody))
 	if err != nil {
 		writeSSEEvent(w, StreamEvent{Type: "error", Error: "요청 생성 실패: " + err.Error()})
 		return
@@ -141,9 +146,11 @@ func GenerateFeedbackStream(w http.ResponseWriter, score *models.ScoreResult, la
 		return
 	}
 
-	// 스트리밍 완료 후 누적된 JSON을 파싱하여 done 이벤트로 전송
+	// 스트리밍 완료 후 누적된 텍스트에서 JSON 추출 후 파싱
+	// Qwen 같은 소형 모델은 JSON 앞뒤에 텍스트가 붙을 수 있으므로 extractJSON 사용
+	jsonStr := extractJSON(fullText.String())
 	var feedback models.FeedbackResult
-	if err := json.Unmarshal([]byte(fullText.String()), &feedback); err != nil {
+	if err := json.Unmarshal([]byte(jsonStr), &feedback); err != nil {
 		writeSSEEvent(w, StreamEvent{
 			Type:  "error",
 			Error: fmt.Sprintf("피드백 JSON 파싱 실패: %v (raw: %s)", err, fullText.String()),
