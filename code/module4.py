@@ -39,32 +39,92 @@ def _build_prompt(score: dict, lang: str) -> tuple[str, str]:
 
     # 언어별 강제 지시어 (소형 모델용)
     lang_instruction = {
-        "ko": "반드시 한국어로만 답하세요. All values must be written in Korean (한국어).",
-        "en": "Respond in English only.",
-        "ja": "必ず日本語のみで回答してください。All values must be in Japanese.",
-        "zh": "必须只用中文回答。All values must be in Chinese.",
+        "ko": (
+            "반드시 한국어(한글)로만 작성하세요. "
+            "한자(漢字), 중국어, 일본어 문자를 절대 사용하지 마세요. "
+            "오직 한글, 숫자, 기본 문장부호만 사용하세요. "
+            "NEVER use Chinese characters (漢字/汉字). Korean Hangul only."
+        ),
+        "en": "Respond in English only. No Chinese or Japanese characters.",
+        "ja": "必ず日本語のみで回答してください。中国語の漢字は使用しないでください。",
+        "zh": "必须只用中文回答。不要使用英文。",
     }.get(lang, "Respond in Korean.")
 
-    system = (
-        f"You are an expert piano teacher. {lang_instruction}\n"
-        f"Output ONLY a raw JSON object. No markdown, no explanation, no extra text.\n"
-        f'Required JSON keys: "overall" (string), "pitch" (string), "rhythm" (string), '
-        f'"timing" (string), "tips" (array of 2-3 strings), "encouragement" (string).\n'
-        f"All string values must be written in {lang_name}."
-    )
-
-    user = (
-        f"피아노 연주 분석 결과 (Piano performance data):\n"
-        f"- Score: {score.get('score', 0):.1f}/100\n"
-        f"- Correct notes: {score.get('correct', 0)} / {score.get('total', 0)}\n"
-        f"- Missed notes: {score.get('missed_count', 0)} ({missed_pct:.1f}%)\n"
-        f"- Timing errors: {score.get('wrong_timing_count', 0)}\n"
-        f"- Extra notes: {score.get('extra_count', 0)} ({extra_pct:.1f}%)\n"
-        f"- Avg timing deviation: {score.get('avg_timing_deviation', 0):.3f}s\n\n"
-        f"Write feedback JSON in {lang_name}. Output JSON only."
-    )
+    if lang == "ko":
+        system = (
+            "당신은 전문 피아노 선생님입니다. 학생의 연주 분석 결과를 보고 피드백을 작성합니다.\n"
+            "반드시 순수 한국어(한글)로만 답하세요. 영어, 한자, 중국어를 절대 사용하지 마세요.\n"
+            "아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 쓰지 마세요.\n\n"
+            "출력 예시:\n"
+            '{"overall":"연주가 전반적으로 매우 훌륭합니다. 정확한 음정과 안정된 박자가 인상적입니다.",'
+            '"pitch":"음정 정확도가 높습니다. 조금 더 세밀한 표현을 연습해보세요.",'
+            '"rhythm":"박자가 안정적입니다. 다음 단계로 리듬 변화를 시도해보세요.",'
+            '"timing":"타이밍이 대체로 좋습니다. 빠른 구간에서 조금 더 주의가 필요합니다.",'
+            '"tips":["매일 30분씩 스케일 연습을 하세요.","느린 템포로 정확하게 연습하세요."],'
+            '"encouragement":"정말 잘 하고 있습니다. 계속 연습하면 더욱 발전할 것입니다."}'
+        )
+        user = (
+            f"피아노 연주 분석 결과:\n"
+            f"- 점수: {score.get('score', 0):.1f}점 / 100점\n"
+            f"- 정확한 음표: {score.get('correct', 0)}개 / {score.get('total', 0)}개\n"
+            f"- 누락된 음표: {score.get('missed_count', 0)}개 ({missed_pct:.1f}%)\n"
+            f"- 박자 오류: {score.get('wrong_timing_count', 0)}개\n"
+            f"- 여분의 음표: {score.get('extra_count', 0)}개 ({extra_pct:.1f}%)\n"
+            f"- 평균 타이밍 오차: {score.get('avg_timing_deviation', 0):.3f}초\n\n"
+            "위 결과를 바탕으로 한국어 피드백 JSON을 작성하세요."
+        )
+    else:
+        system = (
+            f"You are an expert piano teacher. {lang_instruction}\n"
+            f"Output ONLY a raw JSON object. No markdown, no extra text.\n"
+            f'Keys: "overall", "pitch", "rhythm", "timing", "tips" (array 2-3), "encouragement".\n'
+            f"All values in {lang_name}."
+        )
+        user = (
+            f"Piano performance data:\n"
+            f"- Score: {score.get('score', 0):.1f}/100\n"
+            f"- Correct: {score.get('correct', 0)}/{score.get('total', 0)}\n"
+            f"- Missed: {score.get('missed_count', 0)} ({missed_pct:.1f}%)\n"
+            f"- Timing errors: {score.get('wrong_timing_count', 0)}\n"
+            f"- Extra: {score.get('extra_count', 0)} ({extra_pct:.1f}%)\n"
+            f"- Avg deviation: {score.get('avg_timing_deviation', 0):.3f}s\n\n"
+            f"Write feedback JSON in {lang_name}."
+        )
 
     return system, user
+
+
+def _contains_cjk(text: str) -> bool:
+    """한자/중국어/일본어 문자 포함 여부 확인."""
+    for ch in text:
+        cp = ord(ch)
+        if 0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF:
+            return True
+    return False
+
+
+def _contains_hangul(text: str) -> bool:
+    """한글 포함 여부 확인."""
+    for ch in text:
+        cp = ord(ch)
+        if 0xAC00 <= cp <= 0xD7A3 or 0x1100 <= cp <= 0x11FF or 0x3130 <= cp <= 0x318F:
+            return True
+    return False
+
+
+def _feedback_contains_cjk(feedback: dict) -> bool:
+    """피드백 dict의 모든 문자열 필드에 한자가 있는지 확인."""
+    fields = [feedback.get(k, "") for k in ("overall", "pitch", "rhythm", "timing", "encouragement")]
+    fields += feedback.get("tips", [])
+    return any(_contains_cjk(f) for f in fields)
+
+
+def _feedback_is_korean(feedback: dict) -> bool:
+    """피드백이 실제로 한국어로 작성됐는지 확인 (한글 문자 존재 여부)."""
+    fields = [feedback.get(k, "") for k in ("overall", "pitch", "rhythm", "timing", "encouragement")]
+    fields += feedback.get("tips", [])
+    full_text = " ".join(fields)
+    return _contains_hangul(full_text)
 
 
 def _extract_json(raw: str) -> str:
@@ -92,7 +152,7 @@ def _call_ollama(system: str, user: str) -> str:
             {"role": "system", "content": system},
             {"role": "user",   "content": user},
         ],
-        "temperature": 0.4,
+        "temperature": 0.1,
         "max_tokens": 1024,
         "stream": False,
     }).encode("utf-8")
@@ -141,31 +201,46 @@ def _call_openai(system: str, user: str) -> str:
     return response.choices[0].message.content
 
 
-def generate_feedback(score: dict, lang: str = "ko") -> dict:
+def generate_feedback(score: dict, lang: str = "ko", max_retry: int = 2) -> dict:
     """
     채점 결과 → LLM 피드백 생성.
 
     OLLAMA_MODEL 설정 시 로컬 Qwen 사용, 없으면 OpenAI 사용.
+    한자 혼입 감지 시 max_retry회 재시도.
 
     Returns:
         { overall, pitch, rhythm, timing, tips, encouragement }
     """
     system, user = _build_prompt(score, lang)
-
     use_ollama = bool(os.environ.get("OLLAMA_MODEL"))
+    caller = _call_ollama if use_ollama else _call_openai
+    model_name = os.environ.get("OLLAMA_MODEL", "OpenAI GPT")
 
-    if use_ollama:
-        print(f"[module4] Ollama({os.environ['OLLAMA_MODEL']}) 피드백 생성 중...", file=sys.stderr)
-        raw = _call_ollama(system, user)
-    else:
-        print("[module4] OpenAI GPT 피드백 생성 중...", file=sys.stderr)
-        raw = _call_openai(system, user)
+    last_err = None
+    for attempt in range(1, max_retry + 1):
+        print(f"[module4] {model_name} 피드백 생성 중... (시도 {attempt}/{max_retry})", file=sys.stderr)
+        try:
+            raw = caller(system, user)
+            json_str = _extract_json(raw)
+            feedback = json.loads(json_str)
 
-    json_str = _extract_json(raw)
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"피드백 JSON 파싱 실패: {e}\nraw: {raw}") from e
+            # 한국어 요청 시 한자 혼입 또는 한글 미포함 → 재시도
+            if lang == "ko":
+                if _feedback_contains_cjk(feedback):
+                    print("[module4] 한자 혼입 감지, 재시도...", file=sys.stderr)
+                    last_err = ValueError("한자 혼입")
+                    continue
+                if not _feedback_is_korean(feedback):
+                    print("[module4] 한국어 미포함 (영어로 응답), 재시도...", file=sys.stderr)
+                    last_err = ValueError("한국어 미포함")
+                    continue
+
+            return feedback
+        except (json.JSONDecodeError, ValueError) as e:
+            last_err = e
+            continue
+
+    raise ValueError(f"피드백 생성 실패 ({max_retry}회 시도): {last_err}")
 
 
 # ── 단독 실행 테스트 ──────────────────────────────────────────────────

@@ -24,9 +24,12 @@ func NormalizeLang(lang string) string {
 
 // langInstruction은 소형 모델(Qwen 등)을 위한 강제 언어 지시어다.
 var langInstruction = map[string]string{
-	"ko": "반드시 한국어로만 작성하세요. 영어를 절대 사용하지 마세요. All output must be in Korean (한국어).",
-	"en": "Respond in English only.",
-	"ja": "必ず日本語のみで回答してください。英語は使用しないでください。",
+	"ko": "반드시 한국어(한글)로만 작성하세요. " +
+		"한자(漢字), 중국어, 일본어 문자를 절대 사용하지 마세요. " +
+		"오직 한글, 숫자, 기본 문장부호(.,!?…)만 사용하세요. " +
+		"NEVER use Chinese characters (漢字/汉字). Korean Hangul only.",
+	"en": "Respond in English only. No Chinese or Japanese characters.",
+	"ja": "必ず日本語のみで回答してください。中国語の漢字は使用しないでください。",
 	"zh": "必须只用中文回答。不要使用英文。",
 }
 
@@ -69,46 +72,42 @@ func gradeLabel(score float64, lang string) string {
 }
 
 // BuildFeedbackPrompt는 채점 결과와 언어 코드를 받아 system/user 프롬프트를 생성한다.
-// Qwen 같은 소형 모델도 한국어로 응답하도록 프롬프트를 언어별로 최적화한다.
+// 한국어는 few-shot 예시를 포함해 소형 모델(Qwen)도 한글로 응답하도록 강제한다.
 func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user string) {
 	lang = NormalizeLang(lang)
 	langName := SupportedLangs[lang]
-	forceInstr := langInstruction[lang]
-
-	system = fmt.Sprintf(
-		"You are an expert piano teacher. %s\n"+
-			"Output ONLY a raw JSON object — no markdown, no explanation, no extra text.\n"+
-			"Required JSON keys (all string values must be in %s):\n"+
-			`  "overall": 2-3문장 종합 평가`+"\n"+
-			`  "pitch": 음정 정확도 피드백`+"\n"+
-			`  "rhythm": 리듬/박자 피드백`+"\n"+
-			`  "timing": 타이밍 피드백`+"\n"+
-			`  "tips": 2-3개 개선 팁 배열`+"\n"+
-			`  "encouragement": 격려 한 문장`,
-		forceInstr, langName,
-	)
 
 	missedPct := 0.0
 	extraPct := 0.0
+	correctPct := 0.0
 	if score.Total > 0 {
 		missedPct = float64(score.MissedCount) / float64(score.Total) * 100
 		extraPct = float64(score.ExtraCount) / float64(score.Total) * 100
-	}
-	correctPct := 0.0
-	if score.Total > 0 {
 		correctPct = float64(score.Correct) / float64(score.Total) * 100
 	}
 
 	if lang == "ko" {
+		// 한국어: few-shot 예시 포함, 전체 프롬프트를 한국어로 작성
+		system = "당신은 전문 피아노 선생님입니다. 학생의 연주 분석 결과를 보고 피드백을 작성합니다.\n" +
+			"반드시 순수 한국어(한글)로만 답하세요. 영어, 한자, 중국어를 절대 사용하지 마세요.\n" +
+			"아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 쓰지 마세요.\n\n" +
+			"출력 예시:\n" +
+			`{"overall":"연주가 전반적으로 매우 훌륭합니다. 정확한 음정과 안정된 박자가 인상적입니다.",` +
+			`"pitch":"음정 정확도가 높습니다. 조금 더 세밀한 표현을 연습해보세요.",` +
+			`"rhythm":"박자가 안정적입니다. 다음 단계로 리듬 변화를 시도해보세요.",` +
+			`"timing":"타이밍이 대체로 좋습니다. 빠른 구간에서 조금 더 주의가 필요합니다.",` +
+			`"tips":["매일 30분씩 스케일 연습을 하세요.","느린 템포로 정확하게 연습하세요."],` +
+			`"encouragement":"정말 잘 하고 있습니다. 계속 연습하면 더욱 발전할 것입니다."}`
+
 		user = fmt.Sprintf(
 			"피아노 연주 분석 결과:\n"+
-				"- 최종 점수: %.1f점 / 100점 (등급: %s)\n"+
+				"- 점수: %.1f점 / 100점 (등급: %s)\n"+
 				"- 정확한 음표: %d개 / %d개 (%.1f%%)\n"+
 				"- 누락된 음표: %d개 (%.1f%%)\n"+
 				"- 박자 오류: %d개\n"+
 				"- 여분의 음표: %d개 (%.1f%%)\n"+
 				"- 평균 타이밍 오차: %.3f초\n\n"+
-				"위 데이터를 바탕으로 한국어로 피드백 JSON을 작성하세요. 반드시 한국어로만 답하세요.",
+				"위 결과를 바탕으로 한국어 피드백 JSON을 작성하세요.",
 			score.Score, gradeLabel(score.Score, lang),
 			score.Correct, score.Total, correctPct,
 			score.MissedCount, missedPct,
@@ -117,6 +116,13 @@ func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user st
 			score.AvgTimingDeviation,
 		)
 	} else {
+		forceInstr := langInstruction[lang]
+		system = fmt.Sprintf(
+			"You are an expert piano teacher. %s\n"+
+				"Output ONLY a raw JSON object. No markdown, no extra text.\n"+
+				`Keys: "overall", "pitch", "rhythm", "timing", "tips" (array 2-3), "encouragement". All values in %s.`,
+			forceInstr, langName,
+		)
 		user = fmt.Sprintf(
 			"Piano performance analysis result:\n"+
 				"- Overall score: %.1f/100 (Grade: %s)\n"+
