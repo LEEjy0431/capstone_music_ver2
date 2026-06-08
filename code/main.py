@@ -136,6 +136,21 @@ def run_pipeline(sheet_path: str, audio_path: str, manual_bpm: float | None = No
     correct       = result['correct'] + len(rescued)
     final_score   = round(correct / total * 100, 2) if total else 0.0
     missed_count  = len(truly_missed)
+    bpm           = sheet_bpm or 120.0
+
+    # 음표에 마디 번호 추가 (4/4 박자 가정)
+    def add_measure(notes: list, bpm: float, limit: int = 20) -> list:
+        spb  = 60.0 / bpm          # 초/박
+        spm  = spb * 4             # 초/마디 (4/4 기준)
+        out  = []
+        for n in notes[:limit]:
+            m = int(n.get('start', 0) / spm) + 1 if spm > 0 else 1
+            out.append({**n, 'measure': m})
+        return out
+
+    missed_with_measure       = add_measure(truly_missed, bpm, limit=20)
+    wrong_timing_with_measure = add_measure(result.get('extra_notes', []), bpm, limit=10)
+    extra_with_measure        = add_measure(result.get('extra_notes', []), bpm, limit=10)
 
     return {
         'score':               final_score,
@@ -145,16 +160,18 @@ def run_pipeline(sheet_path: str, audio_path: str, manual_bpm: float | None = No
         'wrong_timing_count':  result.get('wide_rescued', 0) + result.get('octave_rescued', 0),
         'extra_count':         result.get('extra_count', 0),
         'avg_timing_deviation': result.get('avg_timing_deviation', 0.0),
-        # 상세 매칭 내역 (Go 모델에서 추가 필드로 사용)
+        'bpm':                 bpm,
+        # 상세 매칭 내역
         'direct_matched':      result.get('direct_matched', 0),
         'sustain_matched':     result.get('sustain_matched', 0),
         'wide_rescued':        result.get('wide_rescued', 0),
         'octave_rescued':      result.get('octave_rescued', 0),
         'score_aware_rescued': len(rescued),
-        # 음표 목록 (최대 5개)
-        'missed_notes':        truly_missed[:5],
-        'wrong_timing_notes':  result.get('extra_notes', [])[:5],
-        'extra_notes':         result.get('extra_notes', [])[:5],
+        # 음표 목록 (마디 번호 포함, 최대 20개)
+        'missed_notes':        missed_with_measure[:5],          # 화면 표시용
+        'missed_notes_detail': missed_with_measure,              # AI 피드백용
+        'wrong_timing_notes':  wrong_timing_with_measure[:5],
+        'extra_notes':         extra_with_measure[:5],
     }
 
 

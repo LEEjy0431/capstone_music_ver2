@@ -2,6 +2,8 @@ package services
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"capstone/backend/models"
 )
@@ -128,6 +130,7 @@ func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user st
 
 	if lang == "ko" {
 		toneInstr, example := scoreTone(score.Score)
+		missedDetail := formatMissedNotes(score.MissedNotesDetail)
 
 		system = fmt.Sprintf(
 			"당신은 전문 피아노 선생님입니다. 학생의 연주 분석 결과를 보고 솔직하고 정확한 피드백을 작성합니다.\n"+
@@ -145,14 +148,19 @@ func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user st
 				"- 누락된 음표: %d개 (%.1f%%)\n"+
 				"- 박자 오류: %d개\n"+
 				"- 여분의 음표: %d개 (%.1f%%)\n"+
-				"- 평균 타이밍 오차: %.3f초\n\n"+
-				"위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요.",
+				"- 평균 타이밍 오차: %.3f초\n"+
+				"- BPM: %.0f\n\n"+
+				"[마디별 누락 음표]\n%s\n\n"+
+				"위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요.\n"+
+				"'overall'에는 몇 마디에서 어떤 음이 틀렸는지 구체적으로 언급하세요.",
 			score.Score, gradeLabel(score.Score, lang),
 			score.Correct, score.Total, correctPct,
 			score.MissedCount, missedPct,
 			score.WrongTimingCount,
 			score.ExtraCount, extraPct,
 			score.AvgTimingDeviation,
+			score.BPM,
+			missedDetail,
 		)
 	} else {
 		forceInstr := langInstruction[lang]
@@ -201,4 +209,41 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// formatMissedNotes는 누락 음표를 마디별로 그룹화해 읽기 쉬운 문자열로 변환한다.
+// 예: "마디 1: C4, E4 / 마디 3: G4 / 마디 5: D4, F#3"
+func formatMissedNotes(notes []models.NoteDetail) string {
+	if len(notes) == 0 {
+		return "없음"
+	}
+
+	// 마디별 음표 그룹화
+	byMeasure := make(map[int][]string)
+	for _, n := range notes {
+		m := n.Measure
+		if m < 1 {
+			m = 1
+		}
+		byMeasure[m] = append(byMeasure[m], n.Note)
+	}
+
+	// 마디 번호 정렬
+	measures := make([]int, 0, len(byMeasure))
+	for m := range byMeasure {
+		measures = append(measures, m)
+	}
+	sort.Ints(measures)
+
+	parts := make([]string, 0, len(measures))
+	for _, m := range measures {
+		noteList := strings.Join(byMeasure[m], ", ")
+		parts = append(parts, fmt.Sprintf("마디 %d: %s", m, noteList))
+	}
+
+	result := strings.Join(parts, " / ")
+	if len(result) > 400 { // 너무 길면 잘라냄
+		result = result[:397] + "..."
+	}
+	return result
 }

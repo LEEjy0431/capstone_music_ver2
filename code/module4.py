@@ -93,15 +93,24 @@ def _build_prompt(score: dict, lang: str) -> tuple[str, str]:
             "아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 쓰지 마세요.\n"
             f"출력 예시:\n{example}"
         )
+        # 마디별 누락 음표 포맷
+        missed_detail = _format_missed_notes(
+            score.get('missed_notes_detail', score.get('missed_notes', [])),
+            score.get('bpm', 120.0)
+        )
+
         user = (
             f"피아노 연주 분석 결과:\n"
             f"- 점수: {s:.1f}점 / 100점\n"
-            f"- 정확한 음표: {score.get('correct', 0)}개 / {score.get('total', 0)}개 ({100 - missed_pct:.1f}%)\n"
+            f"- 정확한 음표: {score.get('correct', 0)}개 / {score.get('total', 0)}개\n"
             f"- 누락된 음표: {score.get('missed_count', 0)}개 ({missed_pct:.1f}%)\n"
             f"- 박자 오류: {score.get('wrong_timing_count', 0)}개\n"
             f"- 여분의 음표: {score.get('extra_count', 0)}개 ({extra_pct:.1f}%)\n"
-            f"- 평균 타이밍 오차: {score.get('avg_timing_deviation', 0):.3f}초\n\n"
-            "위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요."
+            f"- 평균 타이밍 오차: {score.get('avg_timing_deviation', 0):.3f}초\n"
+            f"- BPM: {score.get('bpm', 120):.0f}\n\n"
+            f"[마디별 누락 음표]\n{missed_detail}\n\n"
+            "위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요.\n"
+            "'overall'에는 몇 마디에서 어떤 음이 틀렸는지 구체적으로 언급하세요."
         )
     else:
         system = (
@@ -122,6 +131,25 @@ def _build_prompt(score: dict, lang: str) -> tuple[str, str]:
         )
 
     return system, user
+
+
+def _format_missed_notes(notes: list, bpm: float = 120.0) -> str:
+    """누락 음표를 마디별로 그룹화해 '마디 1: C4, E4 / 마디 3: G4' 형식으로 반환."""
+    if not notes:
+        return "없음"
+    spb = 60.0 / max(bpm, 1)
+    spm = spb * 4  # 4/4 박자 기준
+
+    by_measure: dict[int, list[str]] = {}
+    for n in notes:
+        start = n.get('start', 0)
+        measure = n.get('measure') or (int(start / spm) + 1 if spm > 0 else 1)
+        note_name = n.get('note', '?')
+        by_measure.setdefault(measure, []).append(note_name)
+
+    parts = [f"마디 {m}: {', '.join(ns)}" for m, ns in sorted(by_measure.items())]
+    result = " / ".join(parts)
+    return result[:400] + "..." if len(result) > 400 else result
 
 
 def _contains_cjk(text: str) -> bool:
