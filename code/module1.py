@@ -362,7 +362,31 @@ def extract_notes_from_musicxml(xml_path: str) -> list[dict]:
                     except Exception:
                         continue
 
+        # ── 후처리: 꾸밈음 제거 + 중복 제거 ──────────────────
+        # 1) duration=0 제거: grace note (꾸밈음/앞꾸밈음)은 오디오에서
+        #    검출 불가능하므로 채점 대상에서 제외
+        before = len(notes_out)
+        notes_out = [n for n in notes_out if n['duration'] > 0.0]
+        grace_removed = before - len(notes_out)
+        if grace_removed:
+            print(f"-> 꾸밈음(grace note) {grace_removed}개 제외")
+
+        # 2) 중복 제거: 같은 (pitch, start) 쌍이 여러 목소리(voice)에서
+        #    중복 추출되는 현상 방지. 앞쪽 것만 유지.
+        seen: set[tuple] = set()
+        deduped = []
+        for n in notes_out:
+            key = (n['pitch'], n['start'])
+            if key not in seen:
+                seen.add(key)
+                deduped.append(n)
+        dup_removed = len(notes_out) - len(deduped)
+        if dup_removed:
+            print(f"-> 중복 음표 {dup_removed}개 제거")
+        notes_out = deduped
+
         notes_out.sort(key=lambda x: (x['start'], x['pitch']))
+        print(f"-> 최종 음표 수: {len(notes_out)}개")
         return notes_out
 
     except Exception as e:

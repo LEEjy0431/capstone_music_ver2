@@ -108,9 +108,10 @@ def _build_prompt(score: dict, lang: str) -> tuple[str, str]:
             f"- 여분의 음표: {score.get('extra_count', 0)}개 ({extra_pct:.1f}%)\n"
             f"- 평균 타이밍 오차: {score.get('avg_timing_deviation', 0):.3f}초\n"
             f"- BPM: {score.get('bpm', 120):.0f}\n\n"
-            f"[마디별 누락 음표]\n{missed_detail}\n\n"
-            "위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요.\n"
-            "'overall'에는 몇 마디에서 어떤 음이 틀렸는지 구체적으로 언급하세요."
+            f"[마디별 누락 음표 — 이 목록에 있는 음표만 언급하세요]\n{missed_detail}\n\n"
+            "주의: 위 누락 음표 목록에 없는 음이름을 절대 만들어내지 마세요.\n"
+            "'overall'과 'pitch' 항목에 위 목록을 참고해 '마디 X에서 Y음을 놓쳤습니다' 형식으로 구체적으로 언급하세요.\n"
+            "위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요."
         )
     else:
         system = (

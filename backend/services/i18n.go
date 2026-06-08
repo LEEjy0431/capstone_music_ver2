@@ -150,9 +150,10 @@ func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user st
 				"- 여분의 음표: %d개 (%.1f%%)\n"+
 				"- 평균 타이밍 오차: %.3f초\n"+
 				"- BPM: %.0f\n\n"+
-				"[마디별 누락 음표]\n%s\n\n"+
-				"위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요.\n"+
-				"'overall'에는 몇 마디에서 어떤 음이 틀렸는지 구체적으로 언급하세요.",
+				"[마디별 누락 음표 — 이 목록에 있는 음표만 언급하세요]\n%s\n\n"+
+				"주의: 위 누락 음표 목록에 없는 음이름을 만들어내지 마세요.\n"+
+				"'overall'과 'pitch' 항목에 위 목록을 참고해 '마디 X에서 Y음을 놓쳤습니다' 형식으로 구체적으로 언급하세요.\n"+
+				"위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요.",
 			score.Score, gradeLabel(score.Score, lang),
 			score.Correct, score.Total, correctPct,
 			score.MissedCount, missedPct,
