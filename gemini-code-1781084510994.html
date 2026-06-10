@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>웹 프레젠테이션 템플릿</title>
+    <title>피아노 연주 자동 평가 시스템</title>
     <style>
         /* 기본 페이지 설정 */
         body, html {
@@ -12,7 +12,7 @@
             width: 100%;
             height: 100%;
             font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-            background-color: #f0f2f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #333;
         }
 
@@ -30,18 +30,18 @@
         /* 개별 슬라이드 기본 스타일 (숨김 상태) */
         .slide {
             position: absolute;
-            width: 80%;
-            max-width: 1000px;
-            min-height: 400px;
+            width: 85%;
+            max-width: 1100px;
+            min-height: 450px;
             background: white;
             padding: 60px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             text-align: center;
             opacity: 0;
-            transform: scale(0.95);
-            transition: all 0.5s ease-in-out;
-            pointer-events: none; /* 숨겨진 슬라이드 클릭 방지 */
+            transform: scale(0.9);
+            transition: all 0.6s ease-in-out;
+            pointer-events: none;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -56,10 +56,69 @@
         }
 
         /* 텍스트 스타일링 */
-        .slide h1 { font-size: 3em; margin-bottom: 0.5em; color: #1a73e8; }
-        .slide h2 { font-size: 2em; margin-bottom: 1em; }
-        .slide p, .slide li { font-size: 1.2em; line-height: 1.6; text-align: left; }
-        .slide ul { padding-left: 20px; }
+        .slide h1 {
+            font-size: 3.5em;
+            margin-bottom: 0.5em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .slide h2 {
+            font-size: 2.5em;
+            margin-bottom: 1em;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 0.5em;
+        }
+        .slide h3 {
+            font-size: 1.5em;
+            color: #764ba2;
+            margin-bottom: 0.5em;
+        }
+        .slide p, .slide li {
+            font-size: 1.1em;
+            line-height: 1.8;
+            text-align: left;
+            color: #555;
+        }
+        .slide ul {
+            padding-left: 40px;
+            text-align: left;
+        }
+        .slide li {
+            margin-bottom: 0.8em;
+        }
+
+        /* 기술 스택 박스 */
+        .tech-box {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px;
+            border-left: 4px solid #667eea;
+            text-align: left;
+            font-size: 1em;
+        }
+
+        /* 피쳐 리스트 */
+        .feature-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature-item {
+            background: #f0f3ff;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #667eea;
+        }
+
+        .feature-item h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
 
         /* 하단 컨트롤 버튼 영역 */
         .controls {
@@ -71,62 +130,291 @@
         }
 
         button {
-            padding: 12px 24px;
+            padding: 14px 32px;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
             border: none;
-            background-color: #1a73e8;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border-radius: 8px;
-            transition: background-color 0.3s, transform 0.1s;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
 
-        button:hover { background-color: #1557b0; }
-        button:active { transform: scale(0.95); }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        button:active { transform: scale(0.98); }
         button:disabled {
-            background-color: #ccc;
+            background: #ccc;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
 
         /* 슬라이드 번호 표시 */
         .slide-counter {
             position: absolute;
             bottom: 20px;
+            right: 40px;
             font-size: 14px;
+            color: #999;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px 16px;
+            border-radius: 20px;
+        }
+
+        /* 강조 텍스트 */
+        .highlight {
+            color: #764ba2;
+            font-weight: bold;
+        }
+
+        /* 타이틀 슬라이드 스타일 */
+        .title-slide {
+            text-align: center !important;
+        }
+
+        .title-slide p {
+            text-align: center !important;
+            font-size: 1.3em;
+            color: #764ba2;
+            margin-top: 20px;
+        }
+
+        .subtitle {
+            font-size: 1.4em;
             color: #666;
+            margin-top: 30px;
         }
     </style>
 </head>
 <body>
 
     <div class="presentation-container">
-        
-        <div class="slide active">
-            <h1>나만의 웹 프레젠테이션</h1>
-            <p>HTML, CSS, JS로 구성된 심플한 템플릿입니다.</p>
+
+        <!-- 슬라이드 1: 타이틀 -->
+        <div class="slide active title-slide">
+            <h1>🎹 피아노 연주 자동 평가 시스템</h1>
+            <p class="subtitle">AI 기반 스마트 연습 도우미</p>
+            <p style="margin-top: 40px; font-size: 1.1em;">음악 악보 분석 X 연주 음원 인식</p>
+            <p style="font-size: 1.1em;">→ GPT 기반 맞춤형 피드백 제공</p>
         </div>
 
+        <!-- 슬라이드 2: 목차 -->
         <div class="slide">
-            <h2>목차</h2>
-            <ul>
-                <li>프로젝트 소개</li>
-                <li>주요 기능</li>
-                <li>기대 효과</li>
-                <li>Q&A</li>
+            <h2>📋 목차</h2>
+            <ul style="font-size: 1.3em; margin-top: 40px;">
+                <li>📌 프로젝트 개요</li>
+                <li>🛠️ 기술 스택 & 아키텍처</li>
+                <li>⭐ 주요 기능</li>
+                <li>💡 사용 방법</li>
+                <li>🚀 기대 효과</li>
+                <li>❓ Q&A</li>
             </ul>
         </div>
 
+        <!-- 슬라이드 3: 프로젝트 개요 -->
         <div class="slide">
-            <h2>핵심 아이디어</h2>
-            <p>이곳에 발표하고자 하는 핵심 내용을 자유롭게 작성하세요. 텍스트, 이미지(&lt;img&gt;), 표(&lt;table&gt;) 등 HTML 태그를 모두 사용할 수 있습니다.</p>
-            <p>중앙에 깔끔하게 정렬되어 청중의 집중도를 높여줍니다.</p>
+            <h2>📌 프로젝트 개요</h2>
+            <div style="text-align: left; margin-top: 20px;">
+                <h3>목적</h3>
+                <p>피아노 학습자가 자신의 연주를 즉시 분석받고 구체적인 피드백을 받을 수 있는 시스템 개발</p>
+
+                <h3 style="margin-top: 30px;">핵심 기능</h3>
+                <ul>
+                    <li><span class="highlight">악보 분석</span> : MusicXML 파일에서 정확한 음표 추출</li>
+                    <li><span class="highlight">음성 인식</span> : WAV 파일에서 연주한 음정과 타이밍 추출</li>
+                    <li><span class="highlight">자동 채점</span> : 악보와 연주 비교분석 (정확도, 누락, 박자)</li>
+                    <li><span class="highlight">AI 피드백</span> : GPT-4o를 활용한 맞춤형 평가</li>
+                </ul>
+            </div>
         </div>
 
+        <!-- 슬라이드 4: 기술 스택 -->
         <div class="slide">
-            <h1>감사합니다</h1>
-            <p>질의응답 시간을 가지겠습니다.</p>
+            <h2>🛠️ 기술 스택</h2>
+            <div style="margin-top: 30px;">
+                <div class="tech-box">
+                    <strong>프론트엔드:</strong> React 18 + Vite + PWA (모바일 앱처럼 설치 가능)
+                </div>
+                <div class="tech-box">
+                    <strong>백엔드:</strong> Go 1.24 (고성능 HTTP 서버)
+                </div>
+                <div class="tech-box">
+                    <strong>음악 분석:</strong> Python 3.10 + music21 + piano_transcription_inference
+                </div>
+                <div class="tech-box">
+                    <strong>AI 피드백:</strong> OpenAI GPT-4o-mini + SSE 스트리밍
+                </div>
+                <div class="tech-box">
+                    <strong>상태 저장:</strong> localStorage (기록) + sync.Map (session, TTL 5분)
+                </div>
+                <div class="tech-box">
+                    <strong>배포:</strong> Netlify (PWA) + Render (백엔드) 또는 단일 Go 서버
+                </div>
+            </div>
+        </div>
+
+        <!-- 슬라이드 5: 아키텍처 상세 -->
+        <div class="slide">
+            <h2>🏗️ 상세 시스템 흐름</h2>
+            <div style="text-align: left; margin-top: 15px; font-size: 0.9em;">
+                <div style="background: #f0f3ff; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #667eea;">
+                    <p style="margin: 5px 0;"><strong>① PWA (React)</strong></p>
+                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">악보(MusicXML) + 연주 음원(WAV) → POST /api/analyze</p>
+                </div>
+
+                <div style="background: #f9f0ff; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #764ba2;">
+                    <p style="margin: 5px 0;"><strong>② Go 백엔드 (HTTP Server)</strong></p>
+                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">파일 수신 → Python subprocess 실행 → session_id 생성</p>
+                </div>
+
+                <div style="background: #fff0f0; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #e74c3c;">
+                    <p style="margin: 5px 0;"><strong>③ Python 파이프라인</strong></p>
+                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                        Module1 (음표 추출) → Module2 (음성 인식) → Module3 (채점)
+                    </p>
+                </div>
+
+                <div style="background: #f0fff0; padding: 12px; border-radius: 8px; border-left: 4px solid #10b981;">
+                    <p style="margin: 5px 0;"><strong>④ 결과 전달 & GPT 피드백</strong></p>
+                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                        즉시: 점수/등급 표시 | 실시간: SSE 스트리밍으로 AI 피드백 전송
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 슬라이드 5-1: Python 파이프라인 상세 -->
+        <div class="slide">
+            <h2>🔄 Python 분석 파이프라인</h2>
+            <div style="margin-top: 25px;">
+                <div class="feature-list">
+                    <div class="feature-item" style="background: #fff3cd; border-color: #ffc107;">
+                        <h3 style="color: #ff9800; margin-top: 0;">📄 Module 1</h3>
+                        <p><strong>MusicXML 파싱</strong></p>
+                        <p style="font-size: 0.9em; color: #666;">music21 라이브러리로 악보 파일 분석</p>
+                        <p style="font-size: 0.9em; color: #666;">↓</p>
+                        <p style="font-size: 0.95em; margin-top: 10px;"><strong>음표 정보 추출</strong></p>
+                        <p style="font-size: 0.85em; color: #666;">(음정, 시간, 길이)</p>
+                    </div>
+
+                    <div class="feature-item" style="background: #e3f2fd; border-color: #2196f3;">
+                        <h3 style="color: #1976d2; margin-top: 0;">🎵 Module 2</h3>
+                        <p><strong>음성 인식</strong></p>
+                        <p style="font-size: 0.9em; color: #666;">piano_transcription 모델로 WAV 분석</p>
+                        <p style="font-size: 0.9em; color: #666;">↓</p>
+                        <p style="font-size: 0.95em; margin-top: 10px;"><strong>연주 음표 추출</strong></p>
+                        <p style="font-size: 0.85em; color: #666;">(실제 친 음정, 타이밍)</p>
+                    </div>
+
+                    <div class="feature-item" style="background: #f3e5f5; border-color: #9c27b0;">
+                        <h3 style="color: #7b1fa2; margin-top: 0;">📊 Module 3</h3>
+                        <p><strong>비교 & 채점</strong></p>
+                        <p style="font-size: 0.9em; color: #666;">악보 vs 연주 음표 비교</p>
+                        <p style="font-size: 0.9em; color: #666;">↓</p>
+                        <p style="font-size: 0.95em; margin-top: 10px;"><strong>점수 계산</strong></p>
+                        <p style="font-size: 0.85em; color: #666;">(정확도, 누락, 박자 오류)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 슬라이드 6: 주요 기능 -->
+        <div class="slide">
+            <h2>⭐ 주요 기능</h2>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <h3>📊 실시간 채점</h3>
+                    <p>연주 분석 후 즉시 점수와 등급 표시 (A+부터 C까지 7단계)</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🎯 정밀 분석</h3>
+                    <p>음정, 리듬, 타이밍, 누락 음표 등 항목별 상세 분석</p>
+                </div>
+                <div class="feature-item">
+                    <h3>🤖 AI 피드백</h3>
+                    <p>GPT 기반 구체적 평가와 개선 팁 제공 (한국어/영어/일본어/중국어)</p>
+                </div>
+                <div class="feature-item">
+                    <h3>📈 학습 기록</h3>
+                    <p>연습 히스토리, 점수 추이, 요일별 통계 자동 저장</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 슬라이드 7: 사용 방법 -->
+        <div class="slide">
+            <h2>💡 사용 방법</h2>
+            <div style="text-align: left; margin-top: 25px;">
+                <ol style="font-size: 1.15em;">
+                    <li>
+                        <strong>분석 탭</strong>으로 이동
+                        <p style="margin: 5px 0 15px 20px; color: #666;">MusicXML 악보 파일과 WAV 연주 음원 업로드</p>
+                    </li>
+                    <li>
+                        <strong>피드백 언어</strong> 선택 (한국어/English/日本語/中文)
+                        <p style="margin: 5px 0 15px 20px; color: #666;">원하는 언어로 피드백 수신</p>
+                    </li>
+                    <li>
+                        <strong>분석 시작</strong> 클릭
+                        <p style="margin: 5px 0 15px 20px; color: #666;">2~5초 내 점수 표시</p>
+                    </li>
+                    <li>
+                        <strong>피드백 확인</strong>
+                        <p style="margin: 5px 0 15px 20px; color: #666;">진행 바 → AI 피드백 카드 (실시간 스트리밍)</p>
+                    </li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- 슬라이드 8: PWA 설치 -->
+        <div class="slide">
+            <h2>📱 모바일 설치 (PWA)</h2>
+            <div style="text-align: left; margin-top: 30px;">
+                <h3>iOS (Safari)</h3>
+                <p style="margin-left: 20px; color: #666;">공유 버튼 → "홈 화면에 추가" → 네이티브 앱처럼 실행</p>
+
+                <h3 style="margin-top: 30px;">Android (Chrome)</h3>
+                <p style="margin-left: 20px; color: #666;">주소창 설치 아이콘 또는 메뉴 → "앱 설치" → 오프라인 사용 가능</p>
+
+                <h3 style="margin-top: 30px;">💾 자동 저장</h3>
+                <p style="margin-left: 20px; color: #666;">모든 연습 기록과 프로필이 기기에 저장되어 언제든 확인 가능</p>
+            </div>
+        </div>
+
+        <!-- 슬라이드 9: 기대 효과 -->
+        <div class="slide">
+            <h2>🚀 기대 효과</h2>
+            <div style="text-align: left; margin-top: 25px;">
+                <div class="feature-item" style="background: #fff9e6; border-color: #ffc107; margin-bottom: 15px;">
+                    <h3 style="color: #ff9800;">🎓 학습 효율성 증대</h3>
+                    <p>전문가 피드백 없이도 스스로 연주를 진단하고 개선할 수 있음</p>
+                </div>
+
+                <div class="feature-item" style="background: #f0f8ff; border-color: #667eea; margin-bottom: 15px;">
+                    <h3 style="color: #667eea;">⏰ 시간·비용 절감</h3>
+                    <p>24/7 언제든 즉시 피드백 수신 (선생님 대기시간 불필요)</p>
+                </div>
+
+                <div class="feature-item" style="background: #f0fdf4; border-color: #10b981;">
+                    <h3 style="color: #10b981;">📊 객관적 분석</h3>
+                    <p>음정, 리듬, 타이밍 등 항목별 수치화된 평가 제공</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 슬라이드 10: 감사의 말 -->
+        <div class="slide title-slide">
+            <h1>감사합니다! 🎵</h1>
+            <p class="subtitle">질의응답 시간을 가지겠습니다</p>
+            <div style="margin-top: 40px; font-size: 1.1em; color: #666;">
+                <p>📧 문의: LEEjy0431@github.com</p>
+                <p>🔗 저장소: github.com/LEEjy0431/capstone_music_ver2</p>
+            </div>
         </div>
 
         <div class="controls">
@@ -134,7 +422,7 @@
             <button id="nextBtn">다음</button>
         </div>
         
-        <div class="slide-counter" id="counter">1 / 4</div>
+        <div class="slide-counter" id="counter">1 / 12</div>
     </div>
 
     <script>
