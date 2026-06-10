@@ -1,5 +1,5 @@
 """
-module4.py — LLM 기반 피드백 생성
+module4.py — LLM 기반 한국어 피드백 생성
 
 우선순위:
   1. OLLAMA_MODEL 설정 → 로컬 Qwen 2.5-1.5B (무료, API 키 불필요)
@@ -7,7 +7,7 @@ module4.py — LLM 기반 피드백 생성
 
 사용:
     from module4 import generate_feedback
-    feedback = generate_feedback(score_dict, lang="ko")
+    feedback = generate_feedback(score_dict)
 """
 
 import json
@@ -17,38 +17,11 @@ import sys
 from urllib import request as urlrequest
 from urllib.error import URLError
 
-SUPPORTED_LANGS = {
-    "ko": "한국어",
-    "en": "English",
-    "ja": "日本語",
-    "zh": "中文",
-}
-
-
-def _normalize_lang(lang: str) -> str:
-    return lang if lang in SUPPORTED_LANGS else "ko"
-
-
-def _build_prompt(score: dict, lang: str) -> tuple[str, str]:
-    lang = _normalize_lang(lang)
-    lang_name = SUPPORTED_LANGS[lang]
-
+def _build_prompt(score: dict, lang: str = "ko") -> tuple[str, str]:
+    """한국어 피드백 프롬프트 생성 (lang 파라미터는 호환성 유지용, 항상 ko 사용)."""
     total = max(score.get("total", 1), 1)
     missed_pct = score.get("missed_count", 0) / total * 100
     extra_pct  = score.get("extra_count", 0)  / total * 100
-
-    # 언어별 강제 지시어 (소형 모델용)
-    lang_instruction = {
-        "ko": (
-            "반드시 한국어(한글)로만 작성하세요. "
-            "한자(漢字), 중국어, 일본어 문자를 절대 사용하지 마세요. "
-            "오직 한글, 숫자, 기본 문장부호만 사용하세요. "
-            "NEVER use Chinese characters (漢字/汉字). Korean Hangul only."
-        ),
-        "en": "Respond in English only. No Chinese or Japanese characters.",
-        "ja": "必ず日本語のみで回答してください。中国語の漢字は使用しないでください。",
-        "zh": "必须只用中文回答。不要使用英文。",
-    }.get(lang, "Respond in Korean.")
 
     # 점수 구간별 톤 지시 및 few-shot 예시
     s = score.get('score', 0)
@@ -85,51 +58,33 @@ def _build_prompt(score: dict, lang: str) -> tuple[str, str]:
                    '"tips":["올바른 악보와 음원을 사용하고 있는지 확인하세요.","한 마디씩 아주 천천히 연습하세요.","기초 음계 연습부터 다시 시작하세요."],'
                    '"encouragement":"지금은 많이 부족하지만, 기초부터 차근차근 연습하면 반드시 나아질 것입니다."}')
 
-    if lang == "ko":
-        system = (
-            "당신은 전문 피아노 선생님입니다. 학생의 연주 분석 결과를 보고 솔직하고 정확한 피드백을 작성합니다.\n"
-            "반드시 순수 한국어(한글)로만 답하세요. 영어, 한자, 중국어를 절대 사용하지 마세요.\n\n"
-            f"[톤 지침] {tone}\n\n"
-            "아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 쓰지 마세요.\n"
-            f"출력 예시:\n{example}"
-        )
-        # 마디별 누락 음표 포맷
-        missed_detail = _format_missed_notes(
-            score.get('missed_notes_detail', score.get('missed_notes', [])),
-            score.get('bpm', 120.0)
-        )
+    missed_detail = _format_missed_notes(
+        score.get('missed_notes_detail', score.get('missed_notes', [])),
+        score.get('bpm', 120.0)
+    )
 
-        user = (
-            f"피아노 연주 분석 결과:\n"
-            f"- 점수: {s:.1f}점 / 100점\n"
-            f"- 정확한 음표: {score.get('correct', 0)}개 / {score.get('total', 0)}개\n"
-            f"- 누락된 음표: {score.get('missed_count', 0)}개 ({missed_pct:.1f}%)\n"
-            f"- 박자 오류: {score.get('wrong_timing_count', 0)}개\n"
-            f"- 여분의 음표: {score.get('extra_count', 0)}개 ({extra_pct:.1f}%)\n"
-            f"- 평균 타이밍 오차: {score.get('avg_timing_deviation', 0):.3f}초\n"
-            f"- BPM: {score.get('bpm', 120):.0f}\n\n"
-            f"[마디별 누락 음표 — 이 목록에 있는 음표만 언급하세요]\n{missed_detail}\n\n"
-            "주의: 위 누락 음표 목록에 없는 음이름을 절대 만들어내지 마세요.\n"
-            "'overall'과 'pitch' 항목에 위 목록을 참고해 '마디 X에서 Y음을 놓쳤습니다' 형식으로 구체적으로 언급하세요.\n"
-            "위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요."
-        )
-    else:
-        system = (
-            f"You are an expert piano teacher. {lang_instruction}\n"
-            f"Output ONLY a raw JSON object. No markdown, no extra text.\n"
-            f'Keys: "overall", "pitch", "rhythm", "timing", "tips" (array 2-3), "encouragement".\n'
-            f"All values in {lang_name}."
-        )
-        user = (
-            f"Piano performance data:\n"
-            f"- Score: {score.get('score', 0):.1f}/100\n"
-            f"- Correct: {score.get('correct', 0)}/{score.get('total', 0)}\n"
-            f"- Missed: {score.get('missed_count', 0)} ({missed_pct:.1f}%)\n"
-            f"- Timing errors: {score.get('wrong_timing_count', 0)}\n"
-            f"- Extra: {score.get('extra_count', 0)} ({extra_pct:.1f}%)\n"
-            f"- Avg deviation: {score.get('avg_timing_deviation', 0):.3f}s\n\n"
-            f"Write feedback JSON in {lang_name}."
-        )
+    system = (
+        "당신은 전문 피아노 선생님입니다. 학생의 연주 분석 결과를 보고 솔직하고 정확한 피드백을 작성합니다.\n"
+        "반드시 순수 한국어(한글)로만 답하세요. 영어, 한자, 중국어를 절대 사용하지 마세요.\n\n"
+        f"[톤 지침] {tone}\n\n"
+        "아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 쓰지 마세요.\n"
+        f"출력 예시:\n{example}"
+    )
+
+    user = (
+        f"피아노 연주 분석 결과:\n"
+        f"- 점수: {s:.1f}점 / 100점\n"
+        f"- 정확한 음표: {score.get('correct', 0)}개 / {score.get('total', 0)}개\n"
+        f"- 누락된 음표: {score.get('missed_count', 0)}개 ({missed_pct:.1f}%)\n"
+        f"- 박자 오류: {score.get('wrong_timing_count', 0)}개\n"
+        f"- 여분의 음표: {score.get('extra_count', 0)}개 ({extra_pct:.1f}%)\n"
+        f"- 평균 타이밍 오차: {score.get('avg_timing_deviation', 0):.3f}초\n"
+        f"- BPM: {score.get('bpm', 120):.0f}\n\n"
+        f"[마디별 누락 음표 — 이 목록에 있는 음표만 언급하세요]\n{missed_detail}\n\n"
+        "주의: 위 누락 음표 목록에 없는 음이름을 절대 만들어내지 마세요.\n"
+        "'overall'과 'pitch' 항목에 위 목록을 참고해 '마디 X에서 Y음을 놓쳤습니다' 형식으로 구체적으로 언급하세요.\n"
+        "위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요."
+    )
 
     return system, user
 

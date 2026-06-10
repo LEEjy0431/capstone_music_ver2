@@ -8,66 +8,33 @@ import (
 	"capstone/backend/models"
 )
 
-// SupportedLangs는 lang 코드 → 언어 명칭 매핑이다.
-var SupportedLangs = map[string]string{
-	"ko": "한국어",
-	"en": "English",
-	"ja": "日本語",
-	"zh": "中文",
+// 한국어 단일 지원
+const defaultLang = "ko"
+
+// NormalizeLang은 항상 "ko"를 반환한다 (한국어 고정).
+func NormalizeLang(_ string) string {
+	return defaultLang
 }
 
-// NormalizeLang은 지원하지 않는 언어 코드를 기본값(ko)으로 정규화한다.
-func NormalizeLang(lang string) string {
-	if _, ok := SupportedLangs[lang]; ok {
-		return lang
-	}
-	return "ko"
-}
-
-// langInstruction은 소형 모델(Qwen 등)을 위한 강제 언어 지시어다.
-var langInstruction = map[string]string{
-	"ko": "반드시 한국어(한글)로만 작성하세요. " +
-		"한자(漢字), 중국어, 일본어 문자를 절대 사용하지 마세요. " +
-		"오직 한글, 숫자, 기본 문장부호(.,!?…)만 사용하세요. " +
-		"NEVER use Chinese characters. Korean Hangul only.",
-	"en": "Respond in English only. No Chinese or Japanese characters.",
-	"ja": "必ず日本語のみで回答してください。中国語の漢字は使用しないでください。",
-	"zh": "必须只用中文回答。不要使用英文。",
-}
-
-// gradeLabel은 점수를 언어별 등급 문자열로 변환한다.
-func gradeLabel(score float64, lang string) string {
-	if lang == "ko" {
-		switch {
-		case score >= 95:
-			return "S (완벽)"
-		case score >= 90:
-			return "A+ (매우 우수)"
-		case score >= 85:
-			return "A (우수)"
-		case score >= 80:
-			return "B+ (양호)"
-		case score >= 70:
-			return "B (보통)"
-		case score >= 55:
-			return "C+ (노력 필요)"
-		case score >= 40:
-			return "C (미흡)"
-		default:
-			return "F (많은 연습 필요)"
-		}
-	}
+// gradeLabel은 점수를 한국어 등급 문자열로 변환한다.
+func gradeLabel(score float64) string {
 	switch {
 	case score >= 95:
-		return "S (perfect)"
+		return "S (완벽)"
+	case score >= 90:
+		return "A+ (매우 우수)"
 	case score >= 85:
-		return "A (great)"
+		return "A (우수)"
+	case score >= 80:
+		return "B+ (양호)"
 	case score >= 70:
-		return "B (average)"
+		return "B (보통)"
 	case score >= 55:
-		return "C (needs work)"
+		return "C+ (노력 필요)"
+	case score >= 40:
+		return "C (미흡)"
 	default:
-		return "F (needs significant improvement)"
+		return "F (많은 연습 필요)"
 	}
 }
 
@@ -113,11 +80,9 @@ func scoreTone(score float64) (toneInstruction, example string) {
 	return
 }
 
-// BuildFeedbackPrompt는 채점 결과와 언어 코드를 받아 system/user 프롬프트를 생성한다.
-// 점수 구간별 톤과 few-shot 예시를 포함해 정확한 평가를 유도한다.
+// BuildFeedbackPrompt는 채점 결과를 받아 한국어 피드백 프롬프트를 생성한다.
 func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user string) {
-	lang = NormalizeLang(lang)
-	langName := SupportedLangs[lang]
+	lang = NormalizeLang(lang) // 항상 "ko"
 
 	missedPct := 0.0
 	extraPct := 0.0
@@ -128,79 +93,40 @@ func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user st
 		correctPct = float64(score.Correct) / float64(score.Total) * 100
 	}
 
-	if lang == "ko" {
-		toneInstr, example := scoreTone(score.Score)
-		missedDetail := formatMissedNotes(score.MissedNotesDetail)
+	toneInstr, example := scoreTone(score.Score)
+	missedDetail := formatMissedNotes(score.MissedNotesDetail)
 
-		system = fmt.Sprintf(
-			"당신은 전문 피아노 선생님입니다. 학생의 연주 분석 결과를 보고 솔직하고 정확한 피드백을 작성합니다.\n"+
-				"반드시 순수 한국어(한글)로만 답하세요. 영어, 한자, 중국어를 절대 사용하지 마세요.\n\n"+
-				"[톤 지침] %s\n\n"+
-				"아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 쓰지 마세요.\n"+
-				"출력 예시:\n%s",
-			toneInstr, example,
-		)
+	system = fmt.Sprintf(
+		"당신은 전문 피아노 선생님입니다. 학생의 연주 분석 결과를 보고 솔직하고 정확한 피드백을 작성합니다.\n"+
+			"반드시 순수 한국어(한글)로만 답하세요. 영어, 한자, 중국어를 절대 사용하지 마세요.\n\n"+
+			"[톤 지침] %s\n\n"+
+			"아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 쓰지 마세요.\n"+
+			"출력 예시:\n%s",
+		toneInstr, example,
+	)
 
-		user = fmt.Sprintf(
-			"피아노 연주 분석 결과:\n"+
-				"- 점수: %.1f점 / 100점 (등급: %s)\n"+
-				"- 정확한 음표: %d개 / %d개 (%.1f%%)\n"+
-				"- 누락된 음표: %d개 (%.1f%%)\n"+
-				"- 박자 오류: %d개\n"+
-				"- 여분의 음표: %d개 (%.1f%%)\n"+
-				"- 평균 타이밍 오차: %.3f초\n"+
-				"- BPM: %.0f\n\n"+
-				"[마디별 누락 음표 — 이 목록에 있는 음표만 언급하세요]\n%s\n\n"+
-				"주의: 위 누락 음표 목록에 없는 음이름을 만들어내지 마세요.\n"+
-				"'overall'과 'pitch' 항목에 위 목록을 참고해 '마디 X에서 Y음을 놓쳤습니다' 형식으로 구체적으로 언급하세요.\n"+
-				"위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요.",
-			score.Score, gradeLabel(score.Score, lang),
-			score.Correct, score.Total, correctPct,
-			score.MissedCount, missedPct,
-			score.WrongTimingCount,
-			score.ExtraCount, extraPct,
-			score.AvgTimingDeviation,
-			score.BPM,
-			missedDetail,
-		)
-	} else {
-		forceInstr := langInstruction[lang]
-		var toneLine string
-		switch {
-		case score.Score >= 85:
-			toneLine = "The score is high. Be positive and encouraging."
-		case score.Score >= 65:
-			toneLine = "The score is average. Be honest about strengths and weaknesses."
-		case score.Score >= 40:
-			toneLine = "The score is low. Be direct about what needs improvement. Don't over-praise."
-		default:
-			toneLine = "The score is very low. Most notes were missed or wrong. Be honest and clear. Do NOT give false praise."
-		}
-
-		system = fmt.Sprintf(
-			"You are an expert piano teacher. %s\n%s\n"+
-				"Output ONLY a raw JSON object. No markdown, no extra text.\n"+
-				`Keys: "overall", "pitch", "rhythm", "timing", "tips" (array 2-3), "encouragement". All values in %s.`,
-			forceInstr, toneLine, langName,
-		)
-		user = fmt.Sprintf(
-			"Piano performance:\n"+
-				"- Score: %.1f/100 (Grade: %s)\n"+
-				"- Correct: %d/%d (%.1f%%)\n"+
-				"- Missed: %d (%.1f%%)\n"+
-				"- Timing errors: %d\n"+
-				"- Extra: %d (%.1f%%)\n"+
-				"- Avg deviation: %.3fs\n\n"+
-				"Write honest feedback JSON in %s.",
-			score.Score, gradeLabel(score.Score, lang),
-			score.Correct, score.Total, correctPct,
-			score.MissedCount, missedPct,
-			score.WrongTimingCount,
-			score.ExtraCount, extraPct,
-			score.AvgTimingDeviation,
-			langName,
-		)
-	}
+	user = fmt.Sprintf(
+		"피아노 연주 분석 결과:\n"+
+			"- 점수: %.1f점 / 100점 (등급: %s)\n"+
+			"- 정확한 음표: %d개 / %d개 (%.1f%%)\n"+
+			"- 누락된 음표: %d개 (%.1f%%)\n"+
+			"- 박자 오류: %d개\n"+
+			"- 여분의 음표: %d개 (%.1f%%)\n"+
+			"- 평균 타이밍 오차: %.3f초\n"+
+			"- BPM: %.0f\n\n"+
+			"[마디별 누락 음표 — 이 목록에 있는 음표만 언급하세요]\n%s\n\n"+
+			"주의: 위 누락 음표 목록에 없는 음이름을 만들어내지 마세요.\n"+
+			"'overall'과 'pitch' 항목에 위 목록을 참고해 '마디 X에서 Y음을 놓쳤습니다' 형식으로 구체적으로 언급하세요.\n"+
+			"위 결과를 바탕으로 실제 점수에 맞는 솔직한 한국어 피드백 JSON을 작성하세요.",
+		score.Score, gradeLabel(score.Score),
+		score.Correct, score.Total, correctPct,
+		score.MissedCount, missedPct,
+		score.WrongTimingCount,
+		score.ExtraCount, extraPct,
+		score.AvgTimingDeviation,
+		score.BPM,
+		missedDetail,
+	)
 
 	return
 }

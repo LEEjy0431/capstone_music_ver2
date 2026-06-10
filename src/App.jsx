@@ -82,12 +82,12 @@ export default function App() {
   useEffect(() => { saveRecords(records); }, [records]);
   useEffect(() => { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); }, [profile]);
 
-  // Step 1: Python 채점 — session_id와 score를 즉시 반환
-  async function analyzeStep1(sheetFile, audioFile, lang = "ko") {
+  // Step 1: Python 채점 — session_id와 score를 즉시 반환 (한국어 고정)
+  async function analyzeStep1(sheetFile, audioFile) {
     const formData = new FormData();
     formData.append("sheet", sheetFile);
     formData.append("audio", audioFile);
-    formData.append("lang", lang);
+    formData.append("lang", "ko");
 
     const res = await fetch(`${getApiBase()}/api/analyze`, { method: "POST", body: formData });
     const data = await res.json();

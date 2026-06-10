@@ -1,12 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { getApiBase } from "./App";
 
-const LANG_OPTIONS = [
-  { code: "ko", label: "한국어" },
-  { code: "en", label: "English" },
-  { code: "ja", label: "日本語" },
-  { code: "zh", label: "中文" },
-];
 
 // ── 파일 드롭존 ──────────────────────────────────────────────────────────
 function FileDropZone({ C, label, accept, hint, file, onFile }) {
@@ -167,7 +161,7 @@ function Spinner({ color = "#F0B429", size = 16 }) {
 export default function AnalysisPage({ C, onNavigate, onAnalyze, onFeedback }) {
   const [audioFile, setAudioFile] = useState(null);
   const [sheetFile, setSheetFile] = useState(null);
-  const [lang, setLang] = useState("ko");
+  const lang = "ko"; // 한국어 고정
 
   // 단계 상태
   const [step, setStep] = useState("idle"); // idle | analyzing | streaming | done | error
@@ -279,17 +273,6 @@ export default function AnalysisPage({ C, onNavigate, onAnalyze, onFeedback }) {
           <FileDropZone C={C} label="연주 음원 (WAV)" accept=".wav" hint="WAV 파일을 드래그하거나 클릭" file={audioFile} onFile={setAudioFile} />
           <FileDropZone C={C} label="악보 파일 (XML · PDF · PNG · JPG)" accept=".xml,.musicxml,.mxl,.mid,.midi,.pdf,.png,.jpg,.jpeg" hint="MusicXML / PDF / 이미지 파일을 드래그하거나 클릭" file={sheetFile} onFile={setSheetFile} />
 
-          {/* 언어 선택 */}
-          <div style={{ background: C.surface, borderRadius: 14, padding: "14px 16px" }}>
-            <div style={{ fontSize: 13, color: C.textSecondary, marginBottom: 10, fontWeight: 600 }}>피드백 언어</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {LANG_OPTIONS.map((l) => (
-                <button key={l.code} onClick={() => setLang(l.code)} style={{ flex: 1, padding: "8px 0", borderRadius: 20, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: ".2s", background: lang === l.code ? C.gold : C.cardBg, color: lang === l.code ? C.goldText : C.textSecondary }}>
-                  {l.label}
-                </button>
-              ))}
-            </div>
-          </div>
         </>
       )}
 
