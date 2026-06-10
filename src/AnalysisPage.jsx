@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { getApiBase } from "./App";
 
 const LANG_OPTIONS = [
@@ -175,8 +175,16 @@ export default function AnalysisPage({ C, onNavigate, onAnalyze, onFeedback }) {
   const [streamText, setStreamText] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [error, setError] = useState(null);
+  const [elapsed, setElapsed] = useState(0); // 경과 시간(초)
 
   const busy = step === "analyzing" || step === "streaming";
+
+  // 채점 중 경과 시간 타이머
+  useEffect(() => {
+    if (step !== "analyzing") { setElapsed(0); return; }
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [step]);
 
   async function handleAnalyze() {
     if (!audioFile || !sheetFile || busy) return;
@@ -297,15 +305,33 @@ export default function AnalysisPage({ C, onNavigate, onAnalyze, onFeedback }) {
       )}
 
       {/* Step 1 진행 중 */}
-      {step === "analyzing" && (
-        <div style={{ background: C.surface, borderRadius: 14, padding: 20, display: "flex", alignItems: "center", gap: 12 }}>
-          <Spinner color={C.gold} size={20} />
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>연주 채점 중...</div>
-            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>피아노 음표 분석 중 (10~30초 소요)</div>
+      {step === "analyzing" && (() => {
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        const timeStr = mins > 0 ? `${mins}분 ${secs}초` : `${secs}초`;
+        const stages = [
+          { label: "악보 분석", sec: 5 },
+          { label: "음원 트랜스크립션", sec: 30 },
+          { label: "채점", sec: 90 },
+          { label: "완료 중", sec: 999 },
+        ];
+        const stageLabel = stages.find(s => elapsed <= s.sec)?.label ?? "완료 중";
+        return (
+          <div style={{ background: C.surface, borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Spinner color={C.gold} size={20} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>연주 채점 중... ({stageLabel})</div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 3 }}>경과 시간: {timeStr}</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.7, background: C.cardBg, borderRadius: 10, padding: "10px 12px" }}>
+              🎵 음원 트랜스크립션은 CPU에서 <b style={{color: C.textSecondary}}>1~5분</b> 소요됩니다.<br/>
+              화면을 닫지 말고 잠시 기다려주세요.
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 점수 카드 (Step 1 완료 후) */}
       {result && (
