@@ -101,6 +101,7 @@ func BuildFeedbackPrompt(score models.ScoreResult, lang string) (system, user st
 			"반드시 순수 한국어(한글)로만 답하세요. 영어, 한자, 중국어를 절대 사용하지 마세요.\n\n"+
 			"[톤 지침] %s\n\n"+
 			"아래 JSON 형식으로만 답하세요. 다른 텍스트는 절대 쓰지 마세요.\n"+
+			"허용 키: overall, pitch, rhythm, timing, tips(배열), encouragement — 이 6개만 사용하고 다른 키는 절대 추가하지 마세요.\n"+
 			"출력 예시:\n%s",
 		toneInstr, example,
 	)

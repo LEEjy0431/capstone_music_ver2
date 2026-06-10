@@ -142,16 +142,38 @@ def _feedback_is_korean(feedback: dict) -> bool:
 
 
 def _extract_json(raw: str) -> str:
-    """LLM 응답에서 JSON 블록을 안전하게 추출."""
-    # ```json ... ``` 블록 우선
-    m = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw, re.DOTALL)
+    """LLM 응답에서 JSON 오브젝트를 안전하게 추출 (중괄호 카운팅 방식)."""
+    # 1) ```json ... ``` 코드블록 우선
+    m = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', raw)
     if m:
         return m.group(1)
-    # { ... } 블록
-    m = re.search(r'\{.*\}', raw, re.DOTALL)
-    if m:
-        return m.group(0)
-    return raw
+
+    # 2) 중괄호 깊이 카운팅으로 첫 완전한 JSON 오브젝트 추출
+    start = raw.find('{')
+    if start < 0:
+        return raw
+    depth = 0
+    in_str = False
+    escaped = False
+    for i, c in enumerate(raw[start:], start):
+        if escaped:
+            escaped = False
+            continue
+        if c == '\\' and in_str:
+            escaped = True
+            continue
+        if c == '"':
+            in_str = not in_str
+            continue
+        if in_str:
+            continue
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                return raw[start:i + 1]
+    return raw[start:]
 
 
 def _call_ollama(system: str, user: str) -> str:

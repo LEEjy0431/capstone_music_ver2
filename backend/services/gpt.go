@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"capstone/backend/models"
@@ -80,20 +81,52 @@ func isOllama() bool {
 	return os.Getenv("OLLAMA_MODEL") != ""
 }
 
-// extractJSON은 LLM 응답에서 JSON 블록을 안전하게 추출한다.
-// Qwen 같은 소형 모델은 JSON 앞뒤에 텍스트를 붙이는 경우가 있음.
+// extractJSON은 LLM 응답에서 JSON 오브젝트를 안전하게 추출한다.
+// greedy regex 대신 중괄호 깊이 카운팅을 사용해 문자열 내 } 에 속지 않음.
 func extractJSON(raw string) string {
-	// ```json ... ``` 블록 우선
-	re := regexp.MustCompile("(?s)```(?:json)?\\s*(\\{.*?\\})\\s*```")
+	// 1) ```json ... ``` 코드블록 우선 추출
+	re := regexp.MustCompile("(?s)```(?:json)?\\s*(\\{[\\s\\S]*?\\})\\s*```")
 	if m := re.FindStringSubmatch(raw); len(m) > 1 {
 		return m[1]
 	}
-	// { ... } 블록 추출
-	re2 := regexp.MustCompile(`(?s)\{.*\}`)
-	if m := re2.FindString(raw); m != "" {
-		return m
+
+	// 2) 중괄호 깊이 카운팅으로 첫 번째 완전한 JSON 오브젝트 추출
+	start := strings.Index(raw, "{")
+	if start < 0 {
+		return raw
 	}
-	return raw
+	depth := 0
+	inStr := false
+	escaped := false
+	for i := start; i < len(raw); i++ {
+		c := raw[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if c == '\\' && inStr {
+			escaped = true
+			continue
+		}
+		if c == '"' {
+			inStr = !inStr
+			continue
+		}
+		if inStr {
+			continue
+		}
+		switch c {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return raw[start : i+1]
+			}
+		}
+	}
+	// 닫히지 않은 경우 시작부터 반환
+	return raw[start:]
 }
 
 // containsCJK는 문자열에 한자/중국어/일본어 문자가 포함됐는지 확인한다.
