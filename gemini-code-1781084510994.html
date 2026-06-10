@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웹 프레젠테이션 템플릿</title>
+    <style>
+        /* 기본 페이지 설정 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+
+        /* 슬라이드 컨테이너 설정 (화면 중앙 정렬) */
+        .presentation-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* 개별 슬라이드 기본 스타일 (숨김 상태) */
+        .slide {
+            position: absolute;
+            width: 80%;
+            max-width: 1000px;
+            min-height: 400px;
+            background: white;
+            padding: 60px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            opacity: 0;
+            transform: scale(0.95);
+            transition: all 0.5s ease-in-out;
+            pointer-events: none; /* 숨겨진 슬라이드 클릭 방지 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 활성화된 슬라이드 스타일 (표시 상태) */
+        .slide.active {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        /* 텍스트 스타일링 */
+        .slide h1 { font-size: 3em; margin-bottom: 0.5em; color: #1a73e8; }
+        .slide h2 { font-size: 2em; margin-bottom: 1em; }
+        .slide p, .slide li { font-size: 1.2em; line-height: 1.6; text-align: left; }
+        .slide ul { padding-left: 20px; }
+
+        /* 하단 컨트롤 버튼 영역 */
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            display: flex;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background-color: #1a73e8;
+            color: white;
+            border-radius: 8px;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        button:hover { background-color: #1557b0; }
+        button:active { transform: scale(0.95); }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 슬라이드 번호 표시 */
+        .slide-counter {
+            position: absolute;
+            bottom: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="presentation-container">
+        
+        <div class="slide active">
+            <h1>나만의 웹 프레젠테이션</h1>
+            <p>HTML, CSS, JS로 구성된 심플한 템플릿입니다.</p>
+        </div>
+
+        <div class="slide">
+            <h2>목차</h2>
+            <ul>
+                <li>프로젝트 소개</li>
+                <li>주요 기능</li>
+                <li>기대 효과</li>
+                <li>Q&A</li>
+            </ul>
+        </div>
+
+        <div class="slide">
+            <h2>핵심 아이디어</h2>
+            <p>이곳에 발표하고자 하는 핵심 내용을 자유롭게 작성하세요. 텍스트, 이미지(&lt;img&gt;), 표(&lt;table&gt;) 등 HTML 태그를 모두 사용할 수 있습니다.</p>
+            <p>중앙에 깔끔하게 정렬되어 청중의 집중도를 높여줍니다.</p>
+        </div>
+
+        <div class="slide">
+            <h1>감사합니다</h1>
+            <p>질의응답 시간을 가지겠습니다.</p>
+        </div>
+
+        <div class="controls">
+            <button id="prevBtn">이전</button>
+            <button id="nextBtn">다음</button>
+        </div>
+        
+        <div class="slide-counter" id="counter">1 / 4</div>
+    </div>
+
+    <script>
+        // DOM 요소 선택
+        const slides = document.querySelectorAll('.slide');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const counter = document.getElementById('counter');
+        
+        let currentSlideIndex = 0;
+
+        // 슬라이드 화면 업데이트 함수
+        function updateSlides() {
+            slides.forEach((slide, index) => {
+                if (index === currentSlideIndex) {
+                    slide.classList.add('active');
+                } else {
+                    slide.classList.remove('active');
+                }
+            });
+
+            // 버튼 상태 활성화/비활성화
+            prevBtn.disabled = currentSlideIndex === 0;
+            nextBtn.disabled = currentSlideIndex === slides.length - 1;
+
+            // 슬라이드 카운터 업데이트
+            counter.textContent = `${currentSlideIndex + 1} / ${slides.length}`;
+        }
+
+        // 이전 버튼 클릭 이벤트
+        prevBtn.addEventListener('click', () => {
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                updateSlides();
+            }
+        });
+
+        // 다음 버튼 클릭 이벤트
+        nextBtn.addEventListener('click', () => {
+            if (currentSlideIndex < slides.length - 1) {
+                currentSlideIndex++;
+                updateSlides();
+            }
+        });
+
+        // 키보드 방향키 이벤트 (좌, 우, 위, 아래 키로 제어 가능)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                if (currentSlideIndex > 0) {
+                    currentSlideIndex--;
+                    updateSlides();
+                }
+            } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+                if (currentSlideIndex < slides.length - 1) {
+                    currentSlideIndex++;
+                    updateSlides();
+                }
+            }
+        });
+
+        // 초기 화면 설정 실행
+        updateSlides();
+    </script>
+</body>
+</html>
