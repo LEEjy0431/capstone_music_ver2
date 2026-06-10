@@ -89,6 +89,7 @@ capstone_music_ver2/
 │   ├── module2.py                   # WAV → 음표 추출 (piano_transcription_inference)
 │   ├── module3.py                   # 음표 비교 & 채점
 │   ├── chord_upgrade.py             # CQT 기반 화음 재검증 (누락 음표 보완)
+│   ├── module4.py                   # LLM 피드백 생성 (OpenAI / Ollama 공통 인터페이스)
 │   ├── environment.yml              # Anaconda 환경 정의
 │   └── tests/                       # pytest 단위 테스트 (22개)
 │       ├── conftest.py
@@ -165,6 +166,14 @@ capstone_music_ver2/
 4. chord_upgrade: CQT 기반 화음 재검증
    - 채점에서 놓친(missed) 음표를 CQT 에너지로 재확인
    - 화음 구성음 누락을 줄여 점수 정확도 향상
+
+5. module4: LLM 피드백 생성
+   - OLLAMA_MODEL 설정 시 로컬 Qwen 2.5-1.5B 사용 (무료, 인터넷 불필요)
+   - OPENAI_API_KEY 설정 시 GPT-4o-mini 사용
+   - 점수 구간별 톤 자동 조정 (85점↑ 격려 / 65~85점 균형 / 40~65점 직접 지적 / 40점↓ 솔직 경고)
+   - 마디별 누락 음표 목록을 프롬프트에 포함 → AI가 구체적 위치 언급
+   - 한자 혼입·영어 응답 감지 시 최대 2회 자동 재시도
+   - 반환 구조: { overall, pitch, rhythm, timing, tips[], encouragement }
 ```
 
 ### 등급 기준
@@ -372,6 +381,9 @@ python code/main.py --sheet data/piano_sheet_3.xml --audio data/piano_record_3.w
 
 # 단위 테스트 (22개, module3 순수 로직)
 cd code && pytest tests/ -v
+
+# module4 단독 테스트 (LLM 피드백 생성 확인)
+python code/module4.py          # OpenAI 또는 Ollama 설정에 따라 자동 선택
 ```
 
 ---
