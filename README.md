@@ -545,3 +545,4 @@ export PROJECT_ROOT=/Users/$(whoami)/capstone_music_ver2
 | `src/` | [src/README.md](./src/README.md) |
 | macOS 환경 가이드 | [docs/GUIDE_MAC.md](./docs/GUIDE_MAC.md) |
 | 개발 진행 기록 | [docs/PROGRESS.md](./docs/PROGRESS.md) |
+| 참고문헌 | [docs/REFERENCES.md](./docs/REFERENCES.md) |
