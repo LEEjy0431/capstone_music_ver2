@@ -5,18 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>피아노 연주 자동 평가 시스템</title>
     <style>
-        /* 기본 페이지 설정 */
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             color: #333;
         }
 
-        /* 슬라이드 컨테이너 설정 (화면 중앙 정렬) */
         .presentation-container {
             position: relative;
             width: 100%;
@@ -27,20 +25,19 @@
             overflow: hidden;
         }
 
-        /* 개별 슬라이드 기본 스타일 (숨김 상태) */
         .slide {
             position: absolute;
             width: 85%;
             max-width: 1100px;
-            min-height: 450px;
+            min-height: 480px;
             background: white;
-            padding: 60px;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 55px 65px;
+            border-radius: 20px;
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.5);
             text-align: center;
             opacity: 0;
-            transform: scale(0.9);
-            transition: all 0.6s ease-in-out;
+            transform: translateX(60px) scale(0.96);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             pointer-events: none;
             display: flex;
             flex-direction: column;
@@ -48,443 +45,526 @@
             align-items: center;
         }
 
-        /* 활성화된 슬라이드 스타일 (표시 상태) */
         .slide.active {
             opacity: 1;
-            transform: scale(1);
+            transform: translateX(0) scale(1);
             pointer-events: auto;
         }
 
-        /* 텍스트 스타일링 */
+        /* ── 타이포그래피 ── */
         .slide h1 {
-            font-size: 3.5em;
-            margin-bottom: 0.5em;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-size: 3.2em;
+            margin-bottom: 0.4em;
+            background: linear-gradient(135deg, #e94560 0%, #0f3460 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
         .slide h2 {
-            font-size: 2.5em;
-            margin-bottom: 1em;
-            color: #667eea;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 0.5em;
+            font-size: 2.2em;
+            margin-bottom: 0.8em;
+            color: #0f3460;
+            border-bottom: 3px solid #e94560;
+            padding-bottom: 0.4em;
+            width: 100%;
+            text-align: left;
         }
         .slide h3 {
-            font-size: 1.5em;
-            color: #764ba2;
-            margin-bottom: 0.5em;
+            font-size: 1.25em;
+            color: #e94560;
+            margin-bottom: 0.4em;
         }
         .slide p, .slide li {
-            font-size: 1.1em;
-            line-height: 1.8;
+            font-size: 1.05em;
+            line-height: 1.85;
             text-align: left;
-            color: #555;
+            color: #444;
         }
-        .slide ul {
-            padding-left: 40px;
+        .slide ul, .slide ol {
+            padding-left: 30px;
             text-align: left;
+            width: 100%;
         }
-        .slide li {
-            margin-bottom: 0.8em;
-        }
+        .slide li { margin-bottom: 0.7em; }
 
-        /* 기술 스택 박스 */
-        .tech-box {
-            background: #f8f9fa;
-            padding: 15px;
-            margin: 10px;
-            border-left: 4px solid #667eea;
-            text-align: left;
-            font-size: 1em;
-        }
+        /* ── 강조 ── */
+        .hl { color: #e94560; font-weight: bold; }
+        .hl2 { color: #0f3460; font-weight: bold; }
 
-        /* 피쳐 리스트 */
-        .feature-list {
+        /* ── 카드 그리드 ── */
+        .grid2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 18px;
             margin-top: 20px;
+            width: 100%;
         }
-
-        .feature-item {
-            background: #f0f3ff;
+        .grid3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 14px;
+            margin-top: 20px;
+            width: 100%;
+        }
+        .card {
+            background: #f7f8fc;
             padding: 20px;
+            border-radius: 12px;
+            border-top: 4px solid #e94560;
+            text-align: left;
+        }
+        .card h3 { margin-top: 0; font-size: 1.1em; }
+        .card p  { font-size: 0.92em; color: #555; margin: 0; line-height: 1.6; }
+
+        /* ── 아키텍처 박스 ── */
+        .arch-box {
+            background: #f7f8fc;
+            border-left: 5px solid #e94560;
             border-radius: 8px;
-            border: 2px solid #667eea;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            width: 100%;
+            text-align: left;
         }
+        .arch-box strong { color: #0f3460; }
+        .arch-box span   { font-size: 0.9em; color: #666; display: block; margin-top: 4px; }
 
-        .feature-item h3 {
-            color: #667eea;
-            margin-top: 0;
+        /* ── 모듈 단계 ── */
+        .step-row {
+            display: flex;
+            align-items: stretch;
+            gap: 10px;
+            width: 100%;
+            margin-top: 18px;
         }
+        .step-box {
+            flex: 1;
+            background: #f7f8fc;
+            border-radius: 12px;
+            padding: 18px 14px;
+            text-align: center;
+            border-top: 4px solid #0f3460;
+            position: relative;
+        }
+        .step-box.red  { border-top-color: #e94560; }
+        .step-box.blue { border-top-color: #2a7fcf; }
+        .step-box.purple { border-top-color: #7c3aed; }
+        .step-box.green  { border-top-color: #059669; }
+        .step-num {
+            font-size: 1.6em;
+            font-weight: bold;
+            color: #0f3460;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .step-box h3 { font-size: 1em; margin: 4px 0; color: #222; }
+        .step-box p  { font-size: 0.82em; color: #666; text-align: center; margin: 4px 0; line-height: 1.5; }
+        .arrow { font-size: 1.8em; color: #ccc; display: flex; align-items: center; }
 
-        /* 하단 컨트롤 버튼 영역 */
+        /* ── 기술 스택 태그 ── */
+        .stack-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .tag {
+            background: #0f3460;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            font-weight: bold;
+        }
+        .tag.red { background: #e94560; }
+        .tag.gray { background: #555; }
+
+        /* ── 점수 등급표 ── */
+        .grade-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.95em; }
+        .grade-table th { background: #0f3460; color: white; padding: 8px 14px; }
+        .grade-table td { border: 1px solid #e0e0e0; padding: 8px 14px; text-align: center; }
+        .grade-table tr:nth-child(even) { background: #f7f8fc; }
+
+        /* ── 컨트롤 ── */
         .controls {
             position: absolute;
-            bottom: 40px;
+            bottom: 35px;
             display: flex;
-            gap: 20px;
+            gap: 16px;
             z-index: 10;
         }
-
         button {
-            padding: 14px 32px;
-            font-size: 16px;
+            padding: 12px 30px;
+            font-size: 15px;
             font-weight: bold;
             cursor: pointer;
             border: none;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #e94560 0%, #0f3460 100%);
             color: white;
             border-radius: 8px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.25s;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.35);
         }
+        button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(233, 69, 96, 0.5); }
+        button:active { transform: scale(0.97); }
+        button:disabled { background: #bbb; cursor: not-allowed; transform: none; box-shadow: none; }
 
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-        }
-        button:active { transform: scale(0.98); }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        /* 슬라이드 번호 표시 */
         .slide-counter {
             position: absolute;
-            bottom: 20px;
+            bottom: 18px;
             right: 40px;
-            font-size: 14px;
-            color: #999;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 8px 16px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+            padding: 6px 14px;
             border-radius: 20px;
+            background: rgba(255,255,255,0.1);
         }
 
-        /* 강조 텍스트 */
-        .highlight {
-            color: #764ba2;
-            font-weight: bold;
-        }
+        /* ── 타이틀 슬라이드 ── */
+        .title-slide { text-align: center !important; }
+        .title-slide p { text-align: center !important; }
+        .subtitle { font-size: 1.3em; color: #888; margin-top: 20px; }
 
-        /* 타이틀 슬라이드 스타일 */
-        .title-slide {
-            text-align: center !important;
-        }
-
-        .title-slide p {
-            text-align: center !important;
-            font-size: 1.3em;
-            color: #764ba2;
-            margin-top: 20px;
-        }
-
-        .subtitle {
-            font-size: 1.4em;
-            color: #666;
-            margin-top: 30px;
+        /* ── 스크립트 박스 (대본 메모) ── */
+        .script-note {
+            background: #fffbeb;
+            border: 1px dashed #f59e0b;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 0.82em;
+            color: #92400e;
+            text-align: left;
+            margin-top: 18px;
+            width: 100%;
         }
     </style>
 </head>
 <body>
+<div class="presentation-container">
 
-    <div class="presentation-container">
-
-        <!-- 슬라이드 1: 타이틀 -->
-        <div class="slide active title-slide">
-            <h1>🎹 피아노 연주 자동 평가 시스템</h1>
-            <p class="subtitle">AI 기반 스마트 연습 도우미</p>
-            <p style="margin-top: 40px; font-size: 1.1em;">음악 악보 분석 X 연주 음원 인식</p>
-            <p style="font-size: 1.1em;">→ GPT 기반 맞춤형 피드백 제공</p>
+    <!-- ① 타이틀 -->
+    <div class="slide active title-slide">
+        <h1>🎹 피아노 연주 자동 평가 시스템</h1>
+        <p class="subtitle">악보 + 연주 음원 → AI 채점 & 피드백</p>
+        <div style="margin-top: 36px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <span class="tag">Python 분석 파이프라인</span>
+            <span class="tag red">Go 백엔드</span>
+            <span class="tag">React PWA</span>
+            <span class="tag red">GPT-4o-mini / Ollama</span>
         </div>
-
-        <!-- 슬라이드 2: 목차 -->
-        <div class="slide">
-            <h2>📋 목차</h2>
-            <ul style="font-size: 1.3em; margin-top: 40px;">
-                <li>📌 프로젝트 개요</li>
-                <li>🛠️ 기술 스택 & 아키텍처</li>
-                <li>⭐ 주요 기능</li>
-                <li>💡 사용 방법</li>
-                <li>🚀 기대 효과</li>
-                <li>❓ Q&A</li>
-            </ul>
-        </div>
-
-        <!-- 슬라이드 3: 프로젝트 개요 -->
-        <div class="slide">
-            <h2>📌 프로젝트 개요</h2>
-            <div style="text-align: left; margin-top: 20px;">
-                <h3>목적</h3>
-                <p>피아노 학습자가 자신의 연주를 즉시 분석받고 구체적인 피드백을 받을 수 있는 시스템 개발</p>
-
-                <h3 style="margin-top: 30px;">핵심 기능</h3>
-                <ul>
-                    <li><span class="highlight">악보 분석</span> : MusicXML 파일에서 정확한 음표 추출</li>
-                    <li><span class="highlight">음성 인식</span> : WAV 파일에서 연주한 음정과 타이밍 추출</li>
-                    <li><span class="highlight">자동 채점</span> : 악보와 연주 비교분석 (정확도, 누락, 박자)</li>
-                    <li><span class="highlight">AI 피드백</span> : GPT-4o를 활용한 맞춤형 평가</li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- 슬라이드 4: 기술 스택 -->
-        <div class="slide">
-            <h2>🛠️ 기술 스택</h2>
-            <div style="margin-top: 30px;">
-                <div class="tech-box">
-                    <strong>프론트엔드:</strong> React 18 + Vite + PWA (모바일 앱처럼 설치 가능)
-                </div>
-                <div class="tech-box">
-                    <strong>백엔드:</strong> Go 1.24 (고성능 HTTP 서버)
-                </div>
-                <div class="tech-box">
-                    <strong>음악 분석:</strong> Python 3.10 + music21 + piano_transcription_inference
-                </div>
-                <div class="tech-box">
-                    <strong>AI 피드백:</strong> OpenAI GPT-4o-mini + SSE 스트리밍
-                </div>
-                <div class="tech-box">
-                    <strong>상태 저장:</strong> localStorage (기록) + sync.Map (session, TTL 5분)
-                </div>
-                <div class="tech-box">
-                    <strong>배포:</strong> Netlify (PWA) + Render (백엔드) 또는 단일 Go 서버
-                </div>
-            </div>
-        </div>
-
-        <!-- 슬라이드 5: 아키텍처 상세 -->
-        <div class="slide">
-            <h2>🏗️ 상세 시스템 흐름</h2>
-            <div style="text-align: left; margin-top: 15px; font-size: 0.9em;">
-                <div style="background: #f0f3ff; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #667eea;">
-                    <p style="margin: 5px 0;"><strong>① PWA (React)</strong></p>
-                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">악보(MusicXML) + 연주 음원(WAV) → POST /api/analyze</p>
-                </div>
-
-                <div style="background: #f9f0ff; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #764ba2;">
-                    <p style="margin: 5px 0;"><strong>② Go 백엔드 (HTTP Server)</strong></p>
-                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">파일 수신 → Python subprocess 실행 → session_id 생성</p>
-                </div>
-
-                <div style="background: #fff0f0; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid #e74c3c;">
-                    <p style="margin: 5px 0;"><strong>③ Python 파이프라인</strong></p>
-                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
-                        Module1 (음표 추출) → Module2 (음성 인식) → Module3 (채점)
-                    </p>
-                </div>
-
-                <div style="background: #f0fff0; padding: 12px; border-radius: 8px; border-left: 4px solid #10b981;">
-                    <p style="margin: 5px 0;"><strong>④ 결과 전달 & GPT 피드백</strong></p>
-                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
-                        즉시: 점수/등급 표시 | 실시간: SSE 스트리밍으로 AI 피드백 전송
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- 슬라이드 5-1: Python 파이프라인 상세 -->
-        <div class="slide">
-            <h2>🔄 Python 분석 파이프라인</h2>
-            <div style="margin-top: 25px;">
-                <div class="feature-list">
-                    <div class="feature-item" style="background: #fff3cd; border-color: #ffc107;">
-                        <h3 style="color: #ff9800; margin-top: 0;">📄 Module 1</h3>
-                        <p><strong>MusicXML 파싱</strong></p>
-                        <p style="font-size: 0.9em; color: #666;">music21 라이브러리로 악보 파일 분석</p>
-                        <p style="font-size: 0.9em; color: #666;">↓</p>
-                        <p style="font-size: 0.95em; margin-top: 10px;"><strong>음표 정보 추출</strong></p>
-                        <p style="font-size: 0.85em; color: #666;">(음정, 시간, 길이)</p>
-                    </div>
-
-                    <div class="feature-item" style="background: #e3f2fd; border-color: #2196f3;">
-                        <h3 style="color: #1976d2; margin-top: 0;">🎵 Module 2</h3>
-                        <p><strong>음성 인식</strong></p>
-                        <p style="font-size: 0.9em; color: #666;">piano_transcription 모델로 WAV 분석</p>
-                        <p style="font-size: 0.9em; color: #666;">↓</p>
-                        <p style="font-size: 0.95em; margin-top: 10px;"><strong>연주 음표 추출</strong></p>
-                        <p style="font-size: 0.85em; color: #666;">(실제 친 음정, 타이밍)</p>
-                    </div>
-
-                    <div class="feature-item" style="background: #f3e5f5; border-color: #9c27b0;">
-                        <h3 style="color: #7b1fa2; margin-top: 0;">📊 Module 3</h3>
-                        <p><strong>비교 & 채점</strong></p>
-                        <p style="font-size: 0.9em; color: #666;">악보 vs 연주 음표 비교</p>
-                        <p style="font-size: 0.9em; color: #666;">↓</p>
-                        <p style="font-size: 0.95em; margin-top: 10px;"><strong>점수 계산</strong></p>
-                        <p style="font-size: 0.85em; color: #666;">(정확도, 누락, 박자 오류)</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 슬라이드 6: 주요 기능 -->
-        <div class="slide">
-            <h2>⭐ 주요 기능</h2>
-            <div class="feature-list">
-                <div class="feature-item">
-                    <h3>📊 실시간 채점</h3>
-                    <p>연주 분석 후 즉시 점수와 등급 표시 (A+부터 C까지 7단계)</p>
-                </div>
-                <div class="feature-item">
-                    <h3>🎯 정밀 분석</h3>
-                    <p>음정, 리듬, 타이밍, 누락 음표 등 항목별 상세 분석</p>
-                </div>
-                <div class="feature-item">
-                    <h3>🤖 AI 피드백</h3>
-                    <p>GPT 기반 구체적 평가와 개선 팁 제공 (한국어/영어/일본어/중국어)</p>
-                </div>
-                <div class="feature-item">
-                    <h3>📈 학습 기록</h3>
-                    <p>연습 히스토리, 점수 추이, 요일별 통계 자동 저장</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- 슬라이드 7: 사용 방법 -->
-        <div class="slide">
-            <h2>💡 사용 방법</h2>
-            <div style="text-align: left; margin-top: 25px;">
-                <ol style="font-size: 1.15em;">
-                    <li>
-                        <strong>분석 탭</strong>으로 이동
-                        <p style="margin: 5px 0 15px 20px; color: #666;">MusicXML 악보 파일과 WAV 연주 음원 업로드</p>
-                    </li>
-                    <li>
-                        <strong>피드백 언어</strong> 선택 (한국어/English/日本語/中文)
-                        <p style="margin: 5px 0 15px 20px; color: #666;">원하는 언어로 피드백 수신</p>
-                    </li>
-                    <li>
-                        <strong>분석 시작</strong> 클릭
-                        <p style="margin: 5px 0 15px 20px; color: #666;">2~5초 내 점수 표시</p>
-                    </li>
-                    <li>
-                        <strong>피드백 확인</strong>
-                        <p style="margin: 5px 0 15px 20px; color: #666;">진행 바 → AI 피드백 카드 (실시간 스트리밍)</p>
-                    </li>
-                </ol>
-            </div>
-        </div>
-
-        <!-- 슬라이드 8: PWA 설치 -->
-        <div class="slide">
-            <h2>📱 모바일 설치 (PWA)</h2>
-            <div style="text-align: left; margin-top: 30px;">
-                <h3>iOS (Safari)</h3>
-                <p style="margin-left: 20px; color: #666;">공유 버튼 → "홈 화면에 추가" → 네이티브 앱처럼 실행</p>
-
-                <h3 style="margin-top: 30px;">Android (Chrome)</h3>
-                <p style="margin-left: 20px; color: #666;">주소창 설치 아이콘 또는 메뉴 → "앱 설치" → 오프라인 사용 가능</p>
-
-                <h3 style="margin-top: 30px;">💾 자동 저장</h3>
-                <p style="margin-left: 20px; color: #666;">모든 연습 기록과 프로필이 기기에 저장되어 언제든 확인 가능</p>
-            </div>
-        </div>
-
-        <!-- 슬라이드 9: 기대 효과 -->
-        <div class="slide">
-            <h2>🚀 기대 효과</h2>
-            <div style="text-align: left; margin-top: 25px;">
-                <div class="feature-item" style="background: #fff9e6; border-color: #ffc107; margin-bottom: 15px;">
-                    <h3 style="color: #ff9800;">🎓 학습 효율성 증대</h3>
-                    <p>전문가 피드백 없이도 스스로 연주를 진단하고 개선할 수 있음</p>
-                </div>
-
-                <div class="feature-item" style="background: #f0f8ff; border-color: #667eea; margin-bottom: 15px;">
-                    <h3 style="color: #667eea;">⏰ 시간·비용 절감</h3>
-                    <p>24/7 언제든 즉시 피드백 수신 (선생님 대기시간 불필요)</p>
-                </div>
-
-                <div class="feature-item" style="background: #f0fdf4; border-color: #10b981;">
-                    <h3 style="color: #10b981;">📊 객관적 분석</h3>
-                    <p>음정, 리듬, 타이밍 등 항목별 수치화된 평가 제공</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- 슬라이드 10: 감사의 말 -->
-        <div class="slide title-slide">
-            <h1>감사합니다! 🎵</h1>
-            <p class="subtitle">질의응답 시간을 가지겠습니다</p>
-            <div style="margin-top: 40px; font-size: 1.1em; color: #666;">
-                <p>📧 문의: LEEjy0431@github.com</p>
-                <p>🔗 저장소: github.com/LEEjy0431/capstone_music_ver2</p>
-            </div>
-        </div>
-
-        <div class="controls">
-            <button id="prevBtn">이전</button>
-            <button id="nextBtn">다음</button>
-        </div>
-        
-        <div class="slide-counter" id="counter">1 / 12</div>
+        <p style="margin-top: 36px; font-size: 1em; color: #999; text-align: center;">2026 캡스톤 디자인 발표 | 이주영</p>
     </div>
 
-    <script>
-        // DOM 요소 선택
-        const slides = document.querySelectorAll('.slide');
-        const prevBtn = document.getElementById('prevBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        const counter = document.getElementById('counter');
-        
-        let currentSlideIndex = 0;
+    <!-- ② 목차 -->
+    <div class="slide">
+        <h2>📋 목차</h2>
+        <ul style="font-size: 1.2em; margin-top: 20px;">
+            <li>📌 &nbsp;문제 정의 &amp; 동기</li>
+            <li>🏗️ &nbsp;시스템 개요</li>
+            <li>🔄 &nbsp;Python 분석 파이프라인 (Module 1 ~ 3 + chord_upgrade)</li>
+            <li>🤖 &nbsp;AI 피드백 생성 (Module 4)</li>
+            <li>🛠️ &nbsp;기술 스택</li>
+            <li>📊 &nbsp;결과 &amp; 향후 계획</li>
+            <li>❓ &nbsp;Q&amp;A</li>
+        </ul>
+    </div>
 
-        // 슬라이드 화면 업데이트 함수
-        function updateSlides() {
-            slides.forEach((slide, index) => {
-                if (index === currentSlideIndex) {
-                    slide.classList.add('active');
-                } else {
-                    slide.classList.remove('active');
-                }
-            });
+    <!-- ③ 문제 정의 -->
+    <div class="slide">
+        <h2>📌 문제 정의 &amp; 동기</h2>
+        <div style="width:100%; margin-top: 10px;">
+            <div class="arch-box" style="border-left-color:#e94560;">
+                <strong>❗ 피아노 학습의 한계</strong>
+                <span>선생님 없이는 <b>내 연주가 맞는지 틀렸는지 즉각적으로 알기 어렵다</b></span>
+                <span>레슨 비용 부담 &nbsp;|&nbsp; 24시간 피드백 불가 &nbsp;|&nbsp; 주관적 평가에 의존</span>
+            </div>
+            <div class="arch-box" style="border-left-color:#2a7fcf; margin-top: 14px;">
+                <strong>💡 해결 아이디어</strong>
+                <span>"악보와 내 연주 음원을 올리면, AI가 자동으로 채점하고 피드백을 줄 수 있을까?"</span>
+            </div>
+            <div class="arch-box" style="border-left-color:#059669; margin-top: 14px;">
+                <strong>🎯 목표</strong>
+                <span>언제 어디서나 · 즉시 · 객관적으로 연주를 분석하는 <b>AI 피아노 평가 시스템</b> 개발</span>
+            </div>
+        </div>
+    </div>
 
-            // 버튼 상태 활성화/비활성화
-            prevBtn.disabled = currentSlideIndex === 0;
-            nextBtn.disabled = currentSlideIndex === slides.length - 1;
+    <!-- ④ 시스템 개요 -->
+    <div class="slide">
+        <h2>🏗️ 시스템 개요</h2>
+        <p style="text-align:left; margin-bottom: 14px;">시스템은 <span class="hl">세 가지 구성 요소</span>로 이루어져 있습니다.</p>
+        <div style="width:100%;">
+            <div class="arch-box">
+                <strong>① Python 분석 파이프라인</strong>
+                <span>악보·음원 → 음표 추출 → 비교·채점 (핵심 엔진)</span>
+            </div>
+            <div class="arch-box">
+                <strong>② Go 백엔드 서버</strong>
+                <span>Python 실행 · session 관리 · AI 피드백 SSE 스트리밍</span>
+            </div>
+            <div class="arch-box">
+                <strong>③ React PWA 프론트엔드</strong>
+                <span>파일 업로드 · 결과 시각화 · 모바일 홈 화면 설치 지원</span>
+            </div>
+        </div>
+        <div class="arch-box" style="border-left-color:#059669; margin-top: 6px;">
+            <strong>📡 전체 흐름</strong>
+            <span>파일 업로드 → 채점 결과 <b>즉시 표시</b> → AI 피드백 <b>실시간 스트리밍</b></span>
+        </div>
+    </div>
 
-            // 슬라이드 카운터 업데이트
-            counter.textContent = `${currentSlideIndex + 1} / ${slides.length}`;
-        }
+    <!-- ⑤ 아키텍처 흐름도 -->
+    <div class="slide">
+        <h2>🏗️ 아키텍처 흐름</h2>
+        <div style="width:100%; margin-top: 6px; font-size: 0.93em;">
+            <div class="arch-box" style="border-left-color:#e94560;">
+                <strong>① POST /api/analyze</strong>
+                <span>PWA → 악보(XML/PDF/이미지) + 연주(WAV) 전송</span>
+            </div>
+            <div class="arch-box" style="border-left-color:#2a7fcf;">
+                <strong>② Go 백엔드 수신</strong>
+                <span>파일 임시 저장 → Python subprocess 실행</span>
+            </div>
+            <div class="arch-box" style="border-left-color:#7c3aed;">
+                <strong>③ Python 파이프라인 실행 (최대 20분, CPU 기준)</strong>
+                <span>Module1 (악보 파싱) → Module2 (음표 추출) → Module3 (채점) → chord_upgrade (화음 재검증)</span>
+            </div>
+            <div class="arch-box" style="border-left-color:#059669;">
+                <strong>④ 결과 반환 + session_id 발급</strong>
+                <span>점수·등급 즉시 표시 → GET /api/feedback/stream?session_id=... 로 AI 피드백 SSE 수신</span>
+            </div>
+        </div>
+    </div>
 
-        // 이전 버튼 클릭 이벤트
-        prevBtn.addEventListener('click', () => {
-            if (currentSlideIndex > 0) {
-                currentSlideIndex--;
-                updateSlides();
-            }
-        });
+    <!-- ⑥ Python 파이프라인 — Module 1·2·3 -->
+    <div class="slide">
+        <h2>🔄 Python 파이프라인 (1/2)</h2>
+        <div class="step-row">
+            <div class="step-box red">
+                <span class="step-num">M1</span>
+                <h3>악보 파싱</h3>
+                <p>music21로 MusicXML 파싱</p>
+                <p>Audiveris로 PDF/이미지 → XML 변환</p>
+                <p style="margin-top:8px; color:#e94560; font-size:0.8em;">꾸밈음·중복 음표 제거<br>→ 채점 기준 정밀화</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="step-box blue">
+                <span class="step-num">M2</span>
+                <h3>음표 추출</h3>
+                <p>piano_transcription_inference</p>
+                <p>피아노 특화 LSTM 모델</p>
+                <p style="margin-top:8px; color:#2a7fcf; font-size:0.8em;">Note F1 = <b>0.9677</b><br>velocity·duration 필터링</p>
+            </div>
+            <div class="arrow">→</div>
+            <div class="step-box purple">
+                <span class="step-num">M3</span>
+                <h3>비교 &amp; 채점</h3>
+                <p>글로벌 타이밍 오프셋 추정</p>
+                <p>onset_tolerance 0.15s</p>
+                <p style="margin-top:8px; color:#7c3aed; font-size:0.8em;">score = correct/total × 100</p>
+            </div>
+        </div>
+        <div class="script-note">
+            💬 대본 포인트: Module2의 처리 시간이 길어 채점과 피드백을 두 단계로 분리 → UX 개선
+        </div>
+    </div>
 
-        // 다음 버튼 클릭 이벤트
-        nextBtn.addEventListener('click', () => {
-            if (currentSlideIndex < slides.length - 1) {
-                currentSlideIndex++;
-                updateSlides();
-            }
-        });
+    <!-- ⑦ Python 파이프라인 — chord_upgrade -->
+    <div class="slide">
+        <h2>🔄 Python 파이프라인 (2/2) — 화음 재검증</h2>
+        <div style="width:100%; margin-top: 10px;">
+            <div class="arch-box" style="border-left-color:#059669;">
+                <strong>chord_upgrade.py — CQT 기반 화음 재검증</strong>
+                <span>채점(Module3)에서 <b>누락(missed)으로 분류된 음표</b>를 librosa CQT(Constant-Q Transform)로 재확인</span>
+            </div>
+            <div class="grid2" style="margin-top:14px;">
+                <div class="card" style="border-top-color:#059669;">
+                    <h3>왜 필요한가?</h3>
+                    <p>피아노 화음은 여러 음이 동시에 울림<br>모델이 화음 구성음 일부를 놓치는 경우 발생<br>→ 점수 과소 평가 문제</p>
+                </div>
+                <div class="card" style="border-top-color:#059669;">
+                    <h3>어떻게 동작하나?</h3>
+                    <p>오디오 전체의 CQT 에너지 계산<br>누락 음표 시간대 해당 주파수 에너지 검사<br>에너지 기준 충족 시 → 정답으로 구제</p>
+                </div>
+            </div>
+            <div class="arch-box" style="border-left-color:#059669; margin-top:14px;">
+                <strong>결과</strong>
+                <span>꾸밈음 제거(Module1) + 화음 재검증(chord_upgrade) 조합으로 <b>채점 정확도 대폭 향상</b></span>
+            </div>
+        </div>
+    </div>
 
-        // 키보드 방향키 이벤트 (좌, 우, 위, 아래 키로 제어 가능)
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                if (currentSlideIndex > 0) {
-                    currentSlideIndex--;
-                    updateSlides();
-                }
-            } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
-                if (currentSlideIndex < slides.length - 1) {
-                    currentSlideIndex++;
-                    updateSlides();
-                }
-            }
-        });
+    <!-- ⑧ AI 피드백 — Module 4 -->
+    <div class="slide">
+        <h2>🤖 AI 피드백 생성 — Module 4</h2>
+        <div style="width:100%; margin-top: 8px;">
+            <div class="grid2">
+                <div class="arch-box" style="border-left-color:#e94560;">
+                    <strong>🌐 OpenAI GPT-4o-mini</strong>
+                    <span>API 키 설정 시 자동 선택<br>안정적인 한국어 피드백</span>
+                </div>
+                <div class="arch-box" style="border-left-color:#2a7fcf;">
+                    <strong>💻 Ollama (Qwen 2.5-1.5B)</strong>
+                    <span>로컬 실행 · 무료 · 인터넷 불필요<br>OLLAMA_MODEL 설정 시 우선 사용</span>
+                </div>
+            </div>
+            <div class="arch-box" style="margin-top:12px; border-left-color:#7c3aed;">
+                <strong>📊 점수 구간별 톤 자동 조정</strong>
+                <span>
+                    85점↑ → 격려 중심 &nbsp;|&nbsp;
+                    65~85점 → 균형 평가 &nbsp;|&nbsp;
+                    40~65점 → 직접 지적 &nbsp;|&nbsp;
+                    40점↓ → 솔직한 경고
+                </span>
+            </div>
+            <div class="arch-box" style="border-left-color:#059669;">
+                <strong>📍 마디별 구체적 언급</strong>
+                <span>"3마디에서 C4, E4를 놓쳤습니다" 형식으로 위치 명시 · 한자 혼입 감지 시 자동 재시도(최대 2회)</span>
+            </div>
+            <div class="arch-box" style="border-left-color:#f59e0b;">
+                <strong>📤 반환 구조</strong>
+                <span>overall · pitch · rhythm · timing · tips[] · encouragement → SSE 실시간 스트리밍</span>
+            </div>
+        </div>
+    </div>
 
-        // 초기 화면 설정 실행
-        updateSlides();
-    </script>
+    <!-- ⑨ 기술 스택 -->
+    <div class="slide">
+        <h2>🛠️ 기술 스택</h2>
+        <div style="width:100%; margin-top: 10px; font-size: 0.95em;">
+            <div class="arch-box">
+                <strong>🖥️ 프론트엔드</strong>
+                <div class="stack-row" style="margin-top:8px;">
+                    <span class="tag">React 19</span>
+                    <span class="tag">Vite 8</span>
+                    <span class="tag">vite-plugin-pwa</span>
+                    <span class="tag gray">localStorage</span>
+                </div>
+            </div>
+            <div class="arch-box">
+                <strong>⚙️ 백엔드</strong>
+                <div class="stack-row" style="margin-top:8px;">
+                    <span class="tag red">Go 1.24 (net/http)</span>
+                    <span class="tag gray">SSE 스트리밍</span>
+                    <span class="tag gray">sync.Map TTL 5분</span>
+                </div>
+            </div>
+            <div class="arch-box">
+                <strong>🎵 음악 분석</strong>
+                <div class="stack-row" style="margin-top:8px;">
+                    <span class="tag">Python 3.10</span>
+                    <span class="tag">music21</span>
+                    <span class="tag">piano_transcription_inference</span>
+                    <span class="tag gray">librosa CQT</span>
+                    <span class="tag gray">Audiveris (OMR)</span>
+                </div>
+            </div>
+            <div class="arch-box">
+                <strong>🤖 AI 피드백</strong>
+                <div class="stack-row" style="margin-top:8px;">
+                    <span class="tag red">GPT-4o-mini</span>
+                    <span class="tag red">Ollama · Qwen 2.5-1.5B</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑩ 채점 기준 -->
+    <div class="slide">
+        <h2>📊 채점 기준 &amp; 등급</h2>
+        <div style="width:100%; margin-top:10px;">
+            <div class="arch-box">
+                <strong>채점 공식</strong>
+                <span>score = 정확히 연주한 음표 수 / 기준 음표 수 × 100</span>
+                <span>onset_tolerance: <b>0.15초</b> 이내 → 정답 &nbsp;|&nbsp; wide_tolerance: <b>0.40초</b> → 옥타브·서스테인 구제</span>
+            </div>
+            <table class="grade-table">
+                <thead>
+                    <tr><th>점수</th><th>등급</th><th>점수</th><th>등급</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>95점 이상</td><td><b>A+</b></td><td>75점 이상</td><td><b>B</b></td></tr>
+                    <tr><td>90점 이상</td><td><b>A</b></td><td>70점 이상</td><td><b>C+</b></td></tr>
+                    <tr><td>85점 이상</td><td><b>A-</b></td><td>70점 미만</td><td><b>C</b></td></tr>
+                    <tr><td>80점 이상</td><td><b>B+</b></td><td></td><td></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ⑪ 결과 & 향후 계획 -->
+    <div class="slide">
+        <h2>📊 결과 &amp; 향후 계획</h2>
+        <div style="width:100%;">
+            <div class="grid2" style="margin-top:10px;">
+                <div class="card" style="border-top-color:#059669;">
+                    <h3 style="color:#059669;">✅ 달성한 것</h3>
+                    <p>• 꾸밈음 제거 + 화음 재검증으로 채점 정확도 향상<br>
+                       • 채점·피드백 2단계 분리 → 빠른 UX<br>
+                       • OpenAI / Ollama 이중 지원<br>
+                       • pytest 22개 단위 테스트 전량 통과<br>
+                       • PWA 홈 화면 설치 지원</p>
+                </div>
+                <div class="card" style="border-top-color:#e94560;">
+                    <h3 style="color:#e94560;">🔧 남은 과제</h3>
+                    <p>• CPU → GPU 환경으로 처리 속도 단축<br>
+                       (현재 최대 20분 → 목표 1분 이내)<br>
+                       • Render / 개인 서버 배포<br>
+                       • iOS Safari PWA 실기기 테스트<br>
+                       • module1 통합 테스트 추가</p>
+                </div>
+            </div>
+            <div class="arch-box" style="border-left-color:#059669; margin-top:14px;">
+                <strong>🏗️ 빌드 상태</strong>
+                <span>Go build ✅ &nbsp;|&nbsp; npm run build ✅ (246KB, gzip 70KB) &nbsp;|&nbsp; pytest 22/22 ✅</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑫ 마무리 -->
+    <div class="slide title-slide">
+        <h1>감사합니다 🎵</h1>
+        <p class="subtitle">질의응답 시간을 가지겠습니다</p>
+        <div style="margin-top: 36px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <span class="tag">음악 분석</span>
+            <span class="tag red">AI 피드백</span>
+            <span class="tag">PWA</span>
+            <span class="tag red">Go 백엔드</span>
+        </div>
+        <div style="margin-top: 36px; font-size: 0.95em; color: #888; text-align: center; line-height: 2;">
+            <p>🔗 &nbsp;github.com/LEEjy0431/capstone_music_ver2</p>
+            <p>🌿 &nbsp;브랜치: leejy_mac</p>
+        </div>
+    </div>
+
+    <!-- 컨트롤 -->
+    <div class="controls">
+        <button id="prevBtn">◀ 이전</button>
+        <button id="nextBtn">다음 ▶</button>
+    </div>
+    <div class="slide-counter" id="counter">1 / 12</div>
+</div>
+
+<script>
+    const slides   = document.querySelectorAll('.slide');
+    const prevBtn  = document.getElementById('prevBtn');
+    const nextBtn  = document.getElementById('nextBtn');
+    const counter  = document.getElementById('counter');
+    let cur = 0;
+
+    function go(idx) {
+        slides[cur].classList.remove('active');
+        cur = Math.max(0, Math.min(idx, slides.length - 1));
+        slides[cur].classList.add('active');
+        prevBtn.disabled = cur === 0;
+        nextBtn.disabled = cur === slides.length - 1;
+        counter.textContent = `${cur + 1} / ${slides.length}`;
+    }
+
+    prevBtn.addEventListener('click', () => go(cur - 1));
+    nextBtn.addEventListener('click', () => go(cur + 1));
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                      go(cur - 1);
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ')   go(cur + 1);
+    });
+
+    go(0);
+</script>
 </body>
 </html>
