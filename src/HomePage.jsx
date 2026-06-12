@@ -9,18 +9,34 @@ function generateHeatmap(records) {
       date.setDate(date.getDate()-(15-w)*7-d);
       const key=date.toISOString().slice(0,10);
       const val=map[key]||0;
-      return val>3?4:val>2?3:val>1?2:val>0?4:Math.random()<0.3?Math.floor(Math.random()*3):0;
+      return val>=4?4:val>=3?3:val>=2?2:val>=1?1:0;
     })
   );
 }
 function heatColor(l){return["#2a2a2a","#5c3d00","#8a5e00","#c8931e","#F0B429"][l]??"#2a2a2a";}
+
+function calcStreak(records) {
+  if (!records.length) return 0;
+  const dates=[...new Set(records.map(r=>r.date))].sort().reverse();
+  let streak=0;
+  const today=new Date().toISOString().slice(0,10);
+  let expected=today;
+  for (const date of dates) {
+    if (date===expected) {
+      streak++;
+      const d=new Date(expected); d.setDate(d.getDate()-1);
+      expected=d.toISOString().slice(0,10);
+    } else break;
+  }
+  return streak;
+}
 
 export default function HomePage({ C, onNavigate, records }) {
   const [hovered,setHovered]=useState(null);
   const heatmapData=generateHeatmap(records);
   const total=records.length;
   const avg=total?Math.round(records.reduce((a,r)=>a+r.score,0)/total):0;
-  const streak=total;
+  const streak=calcStreak(records);
   const recent=records.slice(0,11);
 
   const scoreHistory=recent.length>0?[...recent].reverse().map(r=>r.score):[0];

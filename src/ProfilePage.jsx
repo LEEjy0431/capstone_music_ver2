@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { API_BASE_KEY } from "./App";
 
 function Toggle({ on, setOn, C }) {
   return (
@@ -28,6 +29,25 @@ export default function ProfilePage({ C, darkMode, setDarkMode, profile, setProf
   const [form,setForm]=useState({...profile});
   const [emailAlert,setEmailAlert]=useState(true);
   const [autoRecord,setAutoRecord]=useState(true);
+  const [serverUrl,setServerUrl]=useState(()=>localStorage.getItem(API_BASE_KEY)||"");
+  const [connStatus,setConnStatus]=useState(null); // null | "ok" | "fail" | "testing"
+
+  async function testConnection() {
+    const url=(serverUrl||"").replace(/\/+$/,"");
+    if(!url){setConnStatus("fail");return;}
+    setConnStatus("testing");
+    try {
+      const res=await fetch(`${url}/health`,{signal:AbortSignal.timeout(5000)});
+      setConnStatus(res.ok?"ok":"fail");
+    } catch { setConnStatus("fail"); }
+  }
+
+  function saveServerUrl() {
+    const url=(serverUrl||"").replace(/\/+$/,"");
+    if(url) localStorage.setItem(API_BASE_KEY,url);
+    else localStorage.removeItem(API_BASE_KEY);
+    setConnStatus(null);
+  }
 
   const achievements=getAchievements(records);
   const total=records.length;
@@ -104,6 +124,40 @@ export default function ProfilePage({ C, darkMode, setDarkMode, profile, setProf
             </div>
           ))}
         </div>
+      </div>
+
+      {/* 서버 연결 설정 */}
+      <div style={{background:C.surface,borderRadius:16,padding:20}}>
+        <div style={{fontSize:15,fontWeight:600,color:C.textPrimary,marginBottom:6}}>서버 연결</div>
+        <div style={{fontSize:12,color:C.textMuted,marginBottom:14,lineHeight:1.6}}>
+          분석 기능을 사용하려면 Go 백엔드 서버 URL을 입력하세요.<br/>
+          로컬 실행: <span style={{fontFamily:"monospace",color:C.textSecondary}}>http://localhost:8080</span>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          <input
+            value={serverUrl}
+            onChange={e=>{setServerUrl(e.target.value);setConnStatus(null);}}
+            placeholder="http://localhost:8080"
+            style={{flex:1,background:C.cardBg,border:`1px solid ${connStatus==="ok"?"#7ee8a2":connStatus==="fail"?"#ff6b6b":C.border}`,borderRadius:10,padding:"10px 12px",color:C.textPrimary,fontSize:13,outline:"none"}}
+          />
+          <button onClick={testConnection}
+            style={{background:C.cardBg,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 14px",color:C.textSecondary,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>
+            {connStatus==="testing"?"확인 중…":"연결 테스트"}
+          </button>
+        </div>
+        {connStatus==="ok" && (
+          <div style={{fontSize:12,color:"#7ee8a2",marginBottom:10}}>✓ 서버 연결 성공</div>
+        )}
+        {connStatus==="fail" && (
+          <div style={{fontSize:12,color:"#ff6b6b",marginBottom:10}}>✗ 연결 실패 — URL을 확인하거나 서버가 실행 중인지 확인하세요</div>
+        )}
+        <button onClick={saveServerUrl}
+          style={{width:"100%",background:C.gold,border:"none",borderRadius:10,padding:"10px",color:C.goldText,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+          저장
+        </button>
+        {!serverUrl && (
+          <div style={{fontSize:11,color:C.textMuted,marginTop:8,textAlign:"center"}}>URL 비워두면 동일 서버 사용 (Go 직접 서빙 모드)</div>
+        )}
       </div>
 
       {/* 환경 설정 */}

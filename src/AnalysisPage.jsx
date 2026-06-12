@@ -1,105 +1,365 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { getApiBase } from "./App";
 
-export default function AnalysisPage({ C, onNavigate, onUpload }) {
-  const [file,setFile]=useState(null);
-  const [dragging,setDragging]=useState(false);
-  const [analyzing,setAnalyzing]=useState(false);
-  const [result,setResult]=useState(null);
-  const inputRef=useRef();
 
-  function handleFile(f){ if(!f)return; setFile(f); setResult(null); }
-  function handleDrop(e){ e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }
+// ── 파일 드롭존 ──────────────────────────────────────────────────────────
+function FileDropZone({ C, label, accept, hint, file, onFile }) {
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef();
 
-  function handleAnalyze(){
-    if(!file)return;
-    setAnalyzing(true);
-    setTimeout(()=>{
-      const r=onUpload(file.name);
-      setResult(r);
-      setAnalyzing(false);
-    },2500);
+  function handleDrop(e) {
+    e.preventDefault();
+    setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f) onFile(f);
   }
 
-  const scoreColor=(v)=>v>=90?"#80d0ff":v>=80?C.gold:"#ff9f43";
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+      onClick={() => inputRef.current.click()}
+      style={{
+        border: `2px dashed ${dragging ? C.gold : file ? C.goldDark : "#3a3a3a"}`,
+        borderRadius: 14, padding: "24px 18px",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+        cursor: "pointer", background: dragging ? "rgba(240,180,41,0.05)" : C.surface,
+        transition: "all .2s",
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.textSecondary }}>{label}</div>
+      {file ? (
+        <>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.gold, wordBreak: "break-all", textAlign: "center" }}>{file.name}</div>
+          <div style={{ fontSize: 12, color: C.textMuted }}>{(file.size / 1024 / 1024).toFixed(2)} MB</div>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, color: C.textMuted }}>{hint}</div>
+          <div style={{ background: C.gold, color: C.goldText, borderRadius: 8, padding: "6px 16px", fontSize: 12, fontWeight: 700, marginTop: 4 }}>파일 선택</div>
+        </>
+      )}
+      <input ref={inputRef} type="file" accept={accept} style={{ display: "none" }} onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
+    </div>
+  );
+}
+
+// ── 점수 바 ──────────────────────────────────────────────────────────────
+function ScoreBar({ C, label, fraction, color }) {
+  const pct = Math.max(0, Math.min(100, fraction * 100));
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+        <span style={{ fontSize: 13, color: C.textSecondary }}>{label}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color }}>{pct.toFixed(0)}%</span>
+      </div>
+      <div style={{ height: 6, background: "#2a2a2a", borderRadius: 3 }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3, transition: "width 1s ease" }} />
+      </div>
+    </div>
+  );
+}
+
+// ── GPT 피드백 카드 ──────────────────────────────────────────────────────
+function FeedbackCard({ C, feedback }) {
+  return (
+    <div style={{ background: C.cardBg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary }}>AI 피드백</div>
+      {[
+        { label: "종합 평가", text: feedback.overall, color: C.gold },
+        { label: "음정", text: feedback.pitch, color: "#80d0ff" },
+        { label: "리듬", text: feedback.rhythm, color: "#7ee8a2" },
+        { label: "타이밍", text: feedback.timing, color: "#c77dff" },
+      ].map((item) => (
+        <div key={item.label}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: item.color, marginBottom: 4 }}>{item.label}</div>
+          <div style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6 }}>{item.text}</div>
+        </div>
+      ))}
+      {feedback.tips?.length > 0 && (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#ff9f43", marginBottom: 8 }}>개선 포인트</div>
+          {feedback.tips.map((tip, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+              <span style={{ color: "#ff9f43", fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+              <span style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>{tip}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {feedback.encouragement && (
+        <div style={{ background: "rgba(240,180,41,0.1)", borderRadius: 10, padding: "12px 14px", fontSize: 13, color: C.gold, fontStyle: "italic", lineHeight: 1.6 }}>
+          {feedback.encouragement}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 스트리밍 중 표시 카드 ────────────────────────────────────────────────
+const FEEDBACK_SECTIONS = ["종합 평가", "음정", "리듬", "타이밍", "개선 팁", "마무리"];
+
+function StreamingCard({ C, text }) {
+  // JSON 길이 기준 진행률 추정 (평균 완성 JSON ~600자)
+  const pct = Math.min(97, Math.round((text.length / 600) * 100));
+  // 섹션별 활성화 임계값 (균등 분배)
+  const sectionThreshold = 100 / FEEDBACK_SECTIONS.length;
 
   return (
-    <div style={{padding:"56px 18px 110px",display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{ background: C.cardBg, borderRadius: 14, padding: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Spinner color={C.gold} size={14} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.gold }}>AI 피드백 생성 중</span>
+        </div>
+        <span style={{ fontSize: 12, color: C.textMuted }}>{pct}%</span>
+      </div>
+
+      {/* 진행 바 */}
+      <div style={{ height: 5, background: "#2a2a2a", borderRadius: 3, overflow: "hidden", marginBottom: 16 }}>
+        <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg,${C.goldDark},${C.gold})`, borderRadius: 3, transition: "width 0.4s ease" }} />
+      </div>
+
+      {/* 섹션 완료 표시 */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {FEEDBACK_SECTIONS.map((label, i) => {
+          const done = pct >= (i + 1) * sectionThreshold;
+          return (
+            <div key={label} style={{
+              fontSize: 11, padding: "4px 10px", borderRadius: 20,
+              background: done ? "rgba(240,180,41,0.15)" : "#2a2a2a",
+              color: done ? C.gold : C.textMuted,
+              fontWeight: done ? 700 : 400,
+              transition: "all 0.3s",
+              display: "flex", alignItems: "center", gap: 4,
+            }}>
+              {done && <span style={{ fontSize: 9 }}>✓</span>}
+              {label}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Spinner({ color = "#F0B429", size = 16 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      border: `2px solid ${color}40`,
+      borderTopColor: color,
+      animation: "spin .7s linear infinite",
+    }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+// ── 메인 컴포넌트 ────────────────────────────────────────────────────────
+export default function AnalysisPage({ C, onNavigate, onAnalyze, onFeedback }) {
+  const [audioFile, setAudioFile] = useState(null);
+  const [sheetFile, setSheetFile] = useState(null);
+  const lang = "ko"; // 한국어 고정
+
+  // 단계 상태
+  const [step, setStep] = useState("idle"); // idle | analyzing | streaming | done | error
+  const [result, setResult] = useState(null);
+  const [streamText, setStreamText] = useState("");
+  const [feedback, setFeedback] = useState(null);
+  const [error, setError] = useState(null);
+  const [elapsed, setElapsed] = useState(0); // 경과 시간(초)
+
+  const busy = step === "analyzing" || step === "streaming";
+
+  // 채점 중 경과 시간 타이머
+  useEffect(() => {
+    if (step !== "analyzing") { setElapsed(0); return; }
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [step]);
+
+  async function handleAnalyze() {
+    if (!audioFile || !sheetFile || busy) return;
+
+    setStep("analyzing");
+    setError(null);
+    setResult(null);
+    setStreamText("");
+    setFeedback(null);
+
+    let record;
+    try {
+      // Step 1: Python 채점
+      record = await onAnalyze(sheetFile, audioFile, lang);
+      setResult(record);
+    } catch (e) {
+      setError(e.message || "분석 중 오류가 발생했습니다.");
+      setStep("error");
+      return;
+    }
+
+    // Step 2: GPT SSE 스트리밍
+    if (!record.sessionId) { setStep("done"); return; }
+    setStep("streaming");
+
+    const url = `${getApiBase()}/api/feedback/stream?session_id=${encodeURIComponent(record.sessionId)}&lang=${lang}`;
+    const buffer = { text: "" };
+
+    try {
+      const res = await fetch(url);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let rawChunk = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        rawChunk += decoder.decode(value, { stream: true });
+        const blocks = rawChunk.split("\n\n");
+        rawChunk = blocks.pop(); // 마지막 불완전 블록 유지
+
+        for (const block of blocks) {
+          const eventLine = block.match(/^event: (.+)/m)?.[1]?.trim();
+          const dataLine = block.match(/^data: (.+)/m)?.[1]?.trim();
+          if (!dataLine) continue;
+
+          const payload = JSON.parse(dataLine);
+
+          if (eventLine === "chunk" && payload.text) {
+            buffer.text += payload.text;
+            setStreamText(buffer.text);
+          } else if (eventLine === "done" && payload.feedback) {
+            onFeedback(record.id, payload.feedback);
+            setFeedback(payload.feedback);
+            setStep("done");
+          } else if (eventLine === "error") {
+            setError(payload.error || "피드백 생성 실패");
+            setStep("done"); // 점수는 이미 있으므로 done 처리
+          }
+        }
+      }
+    } catch (e) {
+      // SSE 오류는 치명적이지 않음 — 점수 카드는 유지
+      setError("AI 피드백 연결 실패. 점수는 저장되었습니다.");
+      setStep("done");
+    }
+  }
+
+  function handleReset() {
+    setAudioFile(null);
+    setSheetFile(null);
+    setResult(null);
+    setStreamText("");
+    setFeedback(null);
+    setError(null);
+    setStep("idle");
+  }
+
+  const scoreColor = (v) => v >= 90 ? "#80d0ff" : v >= 80 ? C.gold : "#ff9f43";
+
+  return (
+    <div style={{ padding: "56px 18px 110px", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
-        <h1 style={{fontSize:28,fontWeight:700,color:C.textPrimary,margin:0,letterSpacing:"-.02em"}}>연습 분석</h1>
-        <p style={{fontSize:14,color:C.textSecondary,margin:"6px 0 0"}}>음원 파일을 업로드하여 상세한 피드백을 받으세요</p>
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: C.textPrimary, margin: 0 }}>연습 분석</h1>
+        <p style={{ fontSize: 14, color: C.textSecondary, margin: "6px 0 0" }}>악보와 음원을 업로드해 AI 피드백을 받으세요</p>
       </div>
 
-      <div
-        onDragOver={e=>{e.preventDefault();setDragging(true);}}
-        onDragLeave={()=>setDragging(false)}
-        onDrop={handleDrop}
-        onClick={()=>!result&&inputRef.current.click()}
-        style={{border:`2px dashed ${dragging?C.gold:result?C.goldDark:"#3a3a3a"}`,borderRadius:16,padding:"48px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:12,cursor:result?"default":"pointer",background:dragging?"rgba(240,180,41,0.05)":C.surface,transition:"all .2s"}}
-      >
-        <div style={{width:64,height:64,borderRadius:"50%",background:"rgba(240,180,41,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-        </div>
-        <div style={{textAlign:"center"}}>
-          <div style={{fontSize:17,fontWeight:700,color:C.textPrimary,marginBottom:6}}>
-            {file?file.name:"음원 파일 업로드"}
-          </div>
-          <div style={{fontSize:13,color:C.textSecondary}}>
-            {file?`${(file.size/1024/1024).toFixed(2)} MB`:"파일을 여기에 드래그하거나 클릭하여 선택하세요"}
-          </div>
-          {!file&&<div style={{fontSize:12,color:C.textMuted,marginTop:4}}>MP3, WAV, M4A 등 모든 오디오 형식 지원</div>}
-        </div>
-        {!file&&(
-          <button style={{background:C.gold,color:C.goldText,border:"none",borderRadius:12,padding:"12px 28px",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:4}}>
-            파일 선택하기
-          </button>
-        )}
-        <input ref={inputRef} type="file" accept="audio/*" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
-      </div>
+      {/* 파일 선택 (결과 없을 때만) */}
+      {step === "idle" && (
+        <>
+          <FileDropZone C={C} label="연주 음원 (WAV)" accept=".wav" hint="WAV 파일을 드래그하거나 클릭" file={audioFile} onFile={setAudioFile} />
+          <FileDropZone C={C} label="악보 파일 (XML · PDF · PNG · JPG)" accept=".xml,.musicxml,.mxl,.mid,.midi,.pdf,.png,.jpg,.jpeg" hint="MusicXML / PDF / 이미지 파일을 드래그하거나 클릭" file={sheetFile} onFile={setSheetFile} />
 
-      {file&&!result&&(
-        <button onClick={handleAnalyze} disabled={analyzing} style={{width:"100%",background:analyzing?C.goldDark:`linear-gradient(135deg,${C.gold},${C.goldDark})`,border:"none",borderRadius:14,padding:"18px",fontSize:16,fontWeight:700,color:C.goldText,cursor:analyzing?"not-allowed":"pointer",transition:".2s"}}>
-          {analyzing?"⏳ 분석 중...":"🎵 분석 시작하기"}
+        </>
+      )}
+
+      {/* 분석 버튼 */}
+      {(step === "idle" || step === "error") && (
+        <button
+          onClick={handleAnalyze}
+          disabled={!audioFile || !sheetFile}
+          style={{ width: "100%", background: (audioFile && sheetFile) ? `linear-gradient(135deg,${C.gold},${C.goldDark})` : "#2a2a2a", border: "none", borderRadius: 14, padding: "18px", fontSize: 16, fontWeight: 700, color: (audioFile && sheetFile) ? C.goldText : C.textMuted, cursor: (audioFile && sheetFile) ? "pointer" : "not-allowed" }}
+        >
+          분석 시작하기
         </button>
       )}
 
-      {result&&(
-        <>
-          <div style={{background:C.surface,borderRadius:16,padding:20,display:"flex",flexDirection:"column",gap:14}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{fontSize:15,fontWeight:600,color:C.textPrimary}}>분석 완료 ✅</div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:28,fontWeight:700,color:scoreColor(result.score)}}>{result.score}%</div>
-                <div style={{fontSize:13,color:C.textMuted}}>{result.grade}</div>
+      {/* Step 1 진행 중 */}
+      {step === "analyzing" && (() => {
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        const timeStr = mins > 0 ? `${mins}분 ${secs}초` : `${secs}초`;
+        const stages = [
+          { label: "악보 분석", sec: 5 },
+          { label: "음원 트랜스크립션", sec: 30 },
+          { label: "채점", sec: 90 },
+          { label: "완료 중", sec: 999 },
+        ];
+        const stageLabel = stages.find(s => elapsed <= s.sec)?.label ?? "완료 중";
+        return (
+          <div style={{ background: C.surface, borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Spinner color={C.gold} size={20} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.textPrimary }}>연주 채점 중... ({stageLabel})</div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 3 }}>경과 시간: {timeStr}</div>
               </div>
             </div>
-            {[
-              {label:"음정 정확도",value:result.pitch,  color:C.gold},
-              {label:"리듬 안정성",value:result.rhythm,  color:"#7ee8a2"},
-              {label:"다이나믹",   value:result.dynamics,color:"#80d0ff"},
-              {label:"템포 일관성",value:result.tempo,   color:"#c77dff"},
-            ].map(item=>(
-              <div key={item.label}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                  <span style={{fontSize:13,color:C.textSecondary}}>{item.label}</span>
-                  <span style={{fontSize:13,fontWeight:700,color:item.color}}>{item.value}%</span>
-                </div>
-                <div style={{height:6,background:"#2a2a2a",borderRadius:3}}>
-                  <div style={{height:"100%",width:`${item.value}%`,background:item.color,borderRadius:3,transition:"width 1s ease"}}/>
-                </div>
-              </div>
-            ))}
+            <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.7, background: C.cardBg, borderRadius: 10, padding: "10px 12px" }}>
+              🎵 음원 트랜스크립션은 CPU에서 <b style={{color: C.textSecondary}}>1~5분</b> 소요됩니다.<br/>
+              화면을 닫지 말고 잠시 기다려주세요.
+            </div>
           </div>
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>{setFile(null);setResult(null);}} style={{flex:1,background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,padding:"14px",fontSize:14,fontWeight:600,color:C.textSecondary,cursor:"pointer"}}>
-              다시 업로드
-            </button>
-            <button onClick={()=>onNavigate("history")} style={{flex:1,background:`linear-gradient(135deg,${C.gold},${C.goldDark})`,border:"none",borderRadius:14,padding:"14px",fontSize:14,fontWeight:600,color:C.goldText,cursor:"pointer"}}>
-              기록 보기 →
-            </button>
+        );
+      })()}
+
+      {/* 점수 카드 (Step 1 완료 후) */}
+      {result && (
+        <div style={{ background: C.surface, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 4 }}>{result.title}</div>
+              <div style={{ fontSize: 13, color: C.textMuted }}>{result.date} {result.time}</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 36, fontWeight: 700, color: scoreColor(result.score), lineHeight: 1 }}>{result.score.toFixed(1)}</div>
+              <div style={{ fontSize: 12, color: C.textMuted }}>점</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: scoreColor(result.score), marginTop: 2 }}>{result.grade}</div>
+            </div>
           </div>
-        </>
+          <ScoreBar C={C} label={`음정 정확도 (${result.scoreDetail.correct}/${result.scoreDetail.total})`} fraction={result.scoreDetail.total > 0 ? result.scoreDetail.correct / result.scoreDetail.total : 0} color={C.gold} />
+          <ScoreBar C={C} label={`누락 음표 ${result.scoreDetail.missedCount}개`} fraction={result.scoreDetail.total > 0 ? 1 - result.scoreDetail.missedCount / result.scoreDetail.total : 1} color="#7ee8a2" />
+          <ScoreBar C={C} label={`박자 오류 ${result.scoreDetail.wrongTimingCount}개`} fraction={result.scoreDetail.total > 0 ? 1 - result.scoreDetail.wrongTimingCount / result.scoreDetail.total : 1} color="#80d0ff" />
+          <div style={{ fontSize: 12, color: C.textMuted }}>평균 타이밍 편차: {result.scoreDetail.avgTimingDeviation.toFixed(3)}초</div>
+        </div>
+      )}
+
+      {/* Step 2 스트리밍 중 */}
+      {step === "streaming" && streamText && <StreamingCard C={C} text={streamText} />}
+
+      {/* Step 2 완료 */}
+      {feedback && <FeedbackCard C={C} feedback={feedback} />}
+
+      {/* 오류 메시지 */}
+      {error && (
+        <div style={{ background: "rgba(255,100,100,0.1)", border: "1px solid rgba(255,100,100,0.3)", borderRadius: 12, padding: "14px 16px", fontSize: 13, color: "#ff6b6b" }}>
+          {error}
+        </div>
+      )}
+
+      {/* 완료 후 버튼 */}
+      {(step === "done" || (step === "error" && result)) && (
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={handleReset} style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 600, color: C.textSecondary, cursor: "pointer" }}>
+            다시 분석
+          </button>
+          <button onClick={() => onNavigate("history")} style={{ flex: 1, background: `linear-gradient(135deg,${C.gold},${C.goldDark})`, border: "none", borderRadius: 14, padding: 14, fontSize: 14, fontWeight: 600, color: C.goldText, cursor: "pointer" }}>
+            기록 보기 →
+          </button>
+        </div>
       )}
     </div>
   );
