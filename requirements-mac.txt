@@ -1,0 +1,12 @@
+# ============================================================
+# macOS (Apple Silicon M1/M2/M3) 전용
+#
+# 설치 순서:
+#   pip install -r requirements.txt -r requirements-mac.txt -r requirements-llm.txt
+#
+# requirements.txt 의 tensorflow 항목은 비워져 있음.
+# 이 파일이 tensorflow-macos 로 대체 제공.
+# ============================================================
+
+# tensorflow 대신 macOS 전용 패키지 사용 (arm64 지원)
+tensorflow-macos==2.16.2

@@ -1,11 +1,24 @@
+function getMetrics(r) {
+  const d=r.scoreDetail;
+  if (!d||!d.total) return {accuracy:r.score,completeness:r.score,timing:50,precision:100};
+  const accuracy=Math.round((d.correct/d.total)*100);
+  const completeness=Math.round(Math.max(0,(1-d.missedCount/d.total))*100);
+  const timing=Math.round(Math.max(0,(1-(d.avgTimingDeviation||0)/0.5))*100);
+  const precision=Math.round(Math.max(0,(1-d.extraCount/d.total))*100);
+  return {accuracy,completeness,timing,precision};
+}
+
+function mean(arr){return arr.length?Math.round(arr.reduce((a,v)=>a+v,0)/arr.length):0;}
+
 export default function StatsPage({ C, records }) {
   const total=records.length;
   const avg=total?Math.round(records.reduce((a,r)=>a+r.score,0)/total):0;
   const best=total?records.reduce((a,r)=>r.score>a.score?r:a,records[0]):null;
-  const avgPitch=total?Math.round(records.reduce((a,r)=>a+r.pitch,0)/total):0;
-  const avgRhythm=total?Math.round(records.reduce((a,r)=>a+r.rhythm,0)/total):0;
-  const avgDynamics=total?Math.round(records.reduce((a,r)=>a+r.dynamics,0)/total):0;
-  const avgTempo=total?Math.round(records.reduce((a,r)=>a+r.tempo,0)/total):0;
+  const allMetrics=records.map(getMetrics);
+  const avgAccuracy=mean(allMetrics.map(m=>m.accuracy));
+  const avgCompleteness=mean(allMetrics.map(m=>m.completeness));
+  const avgTiming=mean(allMetrics.map(m=>m.timing));
+  const avgPrecision=mean(allMetrics.map(m=>m.precision));
 
   const days=["일","월","화","수","목","금","토"];
   const dayCounts=Array(7).fill(0);
@@ -14,10 +27,10 @@ export default function StatsPage({ C, records }) {
   const maxVal=Math.max(...weekData.map(d=>d.val),1);
 
   const radarSkills=[
-    {label:"리듬",value:avgRhythm},
-    {label:"음정",value:avgPitch},
-    {label:"다이나믹",value:avgDynamics},
-    {label:"템포",value:avgTempo},
+    {label:"정확도",value:avgAccuracy},
+    {label:"완성도",value:avgCompleteness},
+    {label:"타이밍",value:avgTiming},
+    {label:"정밀도",value:avgPrecision},
     {label:"종합",value:avg},
   ];
   const cx=150,cy=150,r=100,n=radarSkills.length;
@@ -100,10 +113,10 @@ export default function StatsPage({ C, records }) {
       <div style={{background:C.surface,borderRadius:16,padding:"22px 22px 18px"}}>
         <div style={{fontSize:15,fontWeight:600,color:C.textPrimary,marginBottom:16}}>항목별 평균</div>
         {[
-          {label:"음정 정확도",value:avgPitch,  color:C.gold},
-          {label:"리듬 안정성",value:avgRhythm, color:"#7ee8a2"},
-          {label:"다이나믹",   value:avgDynamics,color:"#80d0ff"},
-          {label:"템포 일관성",value:avgTempo,  color:"#c77dff"},
+          {label:"음정 정확도",value:avgAccuracy,   color:C.gold},
+          {label:"연주 완성도",value:avgCompleteness,color:"#7ee8a2"},
+          {label:"타이밍 안정성",value:avgTiming,   color:"#80d0ff"},
+          {label:"정밀도",     value:avgPrecision,  color:"#c77dff"},
         ].map(item=>(
           <div key={item.label} style={{marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>

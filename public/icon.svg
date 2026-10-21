@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#111111"/>
+  <!-- Piano keys white -->
+  <rect x="72" y="200" width="52" height="160" rx="6" fill="#f0f0f0"/>
+  <rect x="132" y="200" width="52" height="160" rx="6" fill="#f0f0f0"/>
+  <rect x="192" y="200" width="52" height="160" rx="6" fill="#f0f0f0"/>
+  <rect x="252" y="200" width="52" height="160" rx="6" fill="#f0f0f0"/>
+  <rect x="312" y="200" width="52" height="160" rx="6" fill="#f0f0f0"/>
+  <rect x="372" y="200" width="52" height="160" rx="6" fill="#f0f0f0"/>
+  <!-- Piano keys black -->
+  <rect x="110" y="200" width="36" height="100" rx="4" fill="#1a1a1a"/>
+  <rect x="170" y="200" width="36" height="100" rx="4" fill="#1a1a1a"/>
+  <rect x="290" y="200" width="36" height="100" rx="4" fill="#1a1a1a"/>
+  <rect x="350" y="200" width="36" height="100" rx="4" fill="#1a1a1a"/>
+  <!-- Score arc -->
+  <path d="M 180 155 A 100 100 0 0 1 332 155" stroke="#F0B429" stroke-width="12" fill="none" stroke-linecap="round"/>
+  <!-- Music note -->
+  <circle cx="256" cy="130" r="18" fill="#F0B429"/>
+  <rect x="272" y="96" width="10" height="40" rx="5" fill="#F0B429"/>
+</svg>

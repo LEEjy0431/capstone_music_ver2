@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import HomePage from "./HomePage";
 import AnalysisPage from "./AnalysisPage";
 import HistoryPage from "./HistoryPage";
@@ -35,62 +35,117 @@ const TABS = [
   {id:"profile",label:"프로필",icon:NAV_ICONS.profile},
 ];
 
-function generateFakeResult(fileName) {
-  const pitch=70+Math.floor(Math.random()*25);
-  const rhythm=70+Math.floor(Math.random()*25);
-  const dynamics=70+Math.floor(Math.random()*25);
-  const tempo=70+Math.floor(Math.random()*25);
-  const avg=Math.round((pitch+rhythm+dynamics+tempo)/4);
-  const grade=avg>=90?"A":avg>=85?"A-":avg>=80?"B+":avg>=75?"B":avg>=70?"C+":"C";
-  const now=new Date();
-  const dateStr=now.toISOString().slice(0,10);
-  const hour=now.getHours();
-  const min=now.getMinutes();
-  const ampm=hour>=12?"오후":"오전";
-  const h12=hour%12||12;
-  const timeStr=`${ampm} ${h12}:${String(min).padStart(2,"0")}`;
-  return {
-    id:Date.now(),
-    title:fileName.replace(/\.[^/.]+$/,""),
-    date:dateStr,time:timeStr,
-    duration:`${Math.floor(Math.random()*5+1)}:${String(Math.floor(Math.random()*60)).padStart(2,"0")}`,
-    score:avg,grade,pitch,rhythm,dynamics,tempo,
-  };
+export const API_BASE_KEY = "api_base";
+
+// 런타임 서버 URL 조회 — ProfilePage에서 설정한 URL 우선, 없으면 빌드 환경변수 사용
+export function getApiBase() {
+  return localStorage.getItem(API_BASE_KEY) || (import.meta.env.VITE_API_BASE ?? "");
+}
+
+const STORAGE_KEY = "piano_records";
+const PROFILE_KEY = "piano_profile";
+
+function loadRecords() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveRecords(records) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function formatDateTime() {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const hour = now.getHours();
+  const min = now.getMinutes();
+  const ampm = hour >= 12 ? "오후" : "오전";
+  const h12 = hour % 12 || 12;
+  return { dateStr, timeStr: `${ampm} ${h12}:${String(min).padStart(2, "0")}` };
 }
 
 export default function App() {
-  const [activeTab,setActiveTab]=useState("home");
-  const [darkMode,setDarkMode]=useState(true);
-  const [records,setRecords]=useState([]);
-  const [profile,setProfile]=useState({name:"사용자",email:"user@email.com",level:"초급",joinDate:"2026년 5월"});
-  const C=getTheme(darkMode);
+  const [activeTab, setActiveTab] = useState("home");
+  const [darkMode, setDarkMode] = useState(true);
+  const [records, setRecords] = useState(() => loadRecords());
+  const [profile, setProfile] = useState(() => {
+    const defaults = { name: "사용자", level: "초급", goal: "정확한 연주", email: "", joinDate: new Date().toISOString().slice(0, 10) };
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+    } catch { return defaults; }
+  });
+  const C = getTheme(darkMode);
 
-  function addRecord(fileName){
-    const result=generateFakeResult(fileName);
-    setRecords(prev=>[result,...prev]);
-    return result;
+  useEffect(() => { saveRecords(records); }, [records]);
+  useEffect(() => { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); }, [profile]);
+
+  // Step 1: Python 채점 — session_id와 score를 즉시 반환 (한국어 고정)
+  async function analyzeStep1(sheetFile, audioFile) {
+    const formData = new FormData();
+    formData.append("sheet", sheetFile);
+    formData.append("audio", audioFile);
+    formData.append("lang", "ko");
+
+    const res = await fetch(`${getApiBase()}/api/analyze`, { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "서버 오류");
+
+    const { dateStr, timeStr } = formatDateTime();
+    const record = {
+      id: Date.now(),
+      title: sheetFile.name.replace(/\.[^/.]+$/, ""),
+      date: dateStr,
+      time: timeStr,
+      score: data.score.score,
+      grade: data.grade,
+      lang: data.lang,
+      sessionId: data.session_id,
+      feedback: null,
+      scoreDetail: {
+        correct: data.score.correct,
+        total: data.score.total,
+        missedCount: data.score.missed_count,
+        wrongTimingCount: data.score.wrong_timing_count,
+        extraCount: data.score.extra_count,
+        avgTimingDeviation: data.score.avg_timing_deviation,
+      },
+    };
+    setRecords(prev => [record, ...prev]);
+    return record;
   }
 
-  const pages={
-    home:<HomePage C={C} onNavigate={setActiveTab} records={records}/>,
-    analysis:<AnalysisPage C={C} onNavigate={setActiveTab} onUpload={addRecord}/>,
-    history:<HistoryPage C={C} records={records}/>,
-    stats:<StatsPage C={C} records={records}/>,
-    profile:<ProfilePage C={C} darkMode={darkMode} setDarkMode={setDarkMode} profile={profile} setProfile={setProfile} records={records}/>,
+  // 피드백 수신 후 해당 record에 업데이트
+  function applyFeedback(recordId, feedback) {
+    setRecords(prev => prev.map(r => r.id === recordId ? { ...r, feedback } : r));
+  }
+
+  function deleteRecord(id) {
+    setRecords(prev => prev.filter(r => r.id !== id));
+  }
+
+  const pages = {
+    home: <HomePage C={C} onNavigate={setActiveTab} records={records} />,
+    analysis: <AnalysisPage C={C} onNavigate={setActiveTab} onAnalyze={analyzeStep1} onFeedback={applyFeedback} />,
+    history: <HistoryPage C={C} records={records} onDelete={deleteRecord} />,
+    stats: <StatsPage C={C} records={records} />,
+    profile: <ProfilePage C={C} darkMode={darkMode} setDarkMode={setDarkMode} profile={profile} setProfile={setProfile} records={records} />,
   };
 
   return (
-    <div style={{background:C.bg,minHeight:"100dvh",maxWidth:480,margin:"0 auto",fontFamily:"'Apple SD Gothic Neo','Malgun Gothic',sans-serif",position:"relative",overflowX:"hidden",transition:"background .3s"}}>
-      <style>{`*{box-sizing:border-box;margin:0;padding:0;}body{background:${darkMode?"#0a0a0a":"#e8e8e8"};}::-webkit-scrollbar{display:none;}button,input{font-family:inherit;}`}</style>
+    <div style={{ background: C.bg, minHeight: "100dvh", maxWidth: 480, margin: "0 auto", fontFamily: "'Apple SD Gothic Neo','Malgun Gothic',sans-serif", position: "relative", overflowX: "hidden", transition: "background .3s" }}>
+      <style>{`*{box-sizing:border-box;margin:0;padding:0;}body{background:${darkMode ? "#0a0a0a" : "#e8e8e8"};}::-webkit-scrollbar{display:none;}button,input,select,textarea{font-family:inherit;}`}</style>
       {pages[activeTab]}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:darkMode?"#161616":"#ffffff",borderTop:`1px solid ${C.border}`,display:"flex",padding:"10px 0 20px",zIndex:100,transition:"background .3s"}}>
-        {TABS.map(tab=>(
-          <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:activeTab===tab.id?C.gold:C.textMuted,fontSize:11,transition:"color .2s",padding:"4px 0"}}>
-            {tab.icon(activeTab===tab.id)}
+      <nav style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: darkMode ? "#161616" : "#ffffff", borderTop: `1px solid ${C.border}`, display: "flex", padding: "10px 0 env(safe-area-inset-bottom, 16px)", zIndex: 100, transition: "background .3s" }}>
+        {TABS.map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: activeTab === tab.id ? C.gold : C.textMuted, fontSize: 11, transition: "color .2s", padding: "4px 0" }}>
+            {tab.icon(activeTab === tab.id)}
             <span>{tab.label}</span>
           </button>
         ))}
-      </div>
+      </nav>
     </div>
   );
 }
